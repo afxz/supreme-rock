@@ -68,3 +68,6 @@ This project can be deployed on platforms like Koyeb. Ensure the environment var
 ## Common Issues and Fixes
 - **Duplicate Links Posted**: This issue occurs if the bot fails to track the last posted link properly. The latest update ensures that the bot only posts new or updated links.
 - **Error Notifications**: Any errors encountered during execution are sent to the admin group for quick resolution.
+
+## Health Check
+The bot includes a simple HTTP server running on port 8080 to support health checks. This ensures compatibility with deployment platforms that require health checks.

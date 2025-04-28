@@ -4,6 +4,8 @@ import logging
 from scrape_links import get_latest_canva_link
 from config import BOT_TOKEN, CHANNEL_ID, ADMIN_GROUP_ID
 import asyncio
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
@@ -12,6 +14,17 @@ logger = logging.getLogger()
 # Global variables to track bot status
 last_checked_time = None
 last_posted_link = None
+
+# Health check HTTP server
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"OK")
+
+def start_health_check_server():
+    server = HTTPServer(("0.0.0.0", 8080), HealthCheckHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
 
 async def start(update, context):
     if update.effective_chat.id == ADMIN_GROUP_ID:
@@ -37,6 +50,9 @@ async def notify_admin(bot, message):
 
 def main():
     global last_checked_time, last_posted_link
+
+    # Start the health check server
+    start_health_check_server()
 
     # Initialize the bot application
     application = Application.builder().token(BOT_TOKEN).build()
