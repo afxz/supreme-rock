@@ -57,7 +57,16 @@ def main():
                 # Check if the link is new
                 if latest_link != last_posted_link:
                     # Post the link to the Telegram channel
-                    await application.bot.send_message(chat_id=CHANNEL_ID, text=f"✅ New Canva link: {latest_link}")
+                    await application.bot.send_message(
+                        chat_id=CHANNEL_ID,
+                        text=(
+                            f"✅ **New Canva Link:**\n"
+                            f"{latest_link}\n\n"
+                            f"🔔 *Unmute this channel to get access before others!* ⏩\n\n"
+                            f"⚡ _Powered by_ [@CanvaProInviteLinks](https://t.me/CanvaProInviteLinks)"
+                        ),
+                        parse_mode="MarkdownV2"
+                    )
                     logger.info(f"Posted new link: {latest_link}")
 
                     # Update the last posted link
