@@ -4,11 +4,9 @@ from scrape_links import get_latest_canva_link
 import logging
 from telegram_bot import send_telegram_message
 from config import CHANNEL_ID, ADMIN_GROUP_ID
+from shared_state import last_checked_time, last_posted_link
 
 logger = logging.getLogger()
-
-last_checked_time = None
-last_posted_link = None
 
 async def check_links():
     global last_checked_time, last_posted_link
