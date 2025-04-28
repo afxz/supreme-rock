@@ -59,23 +59,51 @@ The bot validates the following environment variables at startup to ensure they 
 
 If any of these variables are missing or invalid, the bot will raise an error and exit.
 
-## Deployment
-This project can be deployed on platforms like Koyeb. Ensure the environment variables for the bot token, channel ID, and admin group ID are set correctly.
+## Deployment on Koyeb
 
-### Docker Deployment
-1. Build the Docker image:
+This project is now deployable on Koyeb. Follow these steps to deploy:
+
+1. **Create a Koyeb Account**
+   - Go to [Koyeb](https://www.koyeb.com/) and create an account if you don't already have one.
+
+2. **Create a New App**
+   - Log in to your Koyeb dashboard.
+   - Click on "Create App" and select "GitHub" as the source.
+   - Connect your GitHub repository containing this project.
+
+3. **Set Environment Variables**
+   - In the "Environment Variables" section, add the following variables:
+     - `BOT_TOKEN`: Your Telegram bot token.
+     - `CHANNEL_ID`: Your Telegram channel ID.
+     - `ADMIN_GROUP_ID`: Your admin group ID.
+     - `BOT_ADMIN_ID`: Your bot admin ID.
+
+4. **Set the Port**
+   - Koyeb requires a health check endpoint. This project includes a health check server running on port `8080`. Ensure that Koyeb is configured to use this port.
+
+5. **Deploy the App**
+   - Click "Deploy" to start the deployment process.
+   - Once deployed, your bot will be live and accessible.
+
+6. **Monitor Logs**
+   - Use the Koyeb dashboard to monitor logs and ensure the bot is running correctly.
+
+### Health Check
+- The bot includes a health check endpoint at `/health` on port `8080`. Koyeb will use this endpoint to verify that the bot is running.
+
+### Docker Deployment (Optional)
+If you prefer to use Docker, follow these steps:
+
+1. **Build the Docker Image**
    ```bash
    docker build -t canva-bot .
    ```
 
-2. Run the Docker container:
+2. **Run the Docker Container**
    ```bash
-   docker run -d --name canva-bot -e BOT_TOKEN=<your-bot-token> -e CHANNEL_ID=<your-channel-id> -e ADMIN_GROUP_ID=<your-admin-group-id> canva-bot
+   docker run -d --name canva-bot -e BOT_TOKEN=<your-bot-token> -e CHANNEL_ID=<your-channel-id> -e ADMIN_GROUP_ID=<your-admin-group-id> -p 8080:8080 canva-bot
    ```
 
 ## Common Issues and Fixes
 - **Duplicate Links Posted**: This issue occurs if the bot fails to track the last posted link properly. The latest update ensures that the bot only posts new or updated links.
 - **Error Notifications**: Any errors encountered during execution are sent to the admin group for quick resolution.
-
-## Health Check
-The bot includes a simple HTTP server running on port 8080 to support health checks. This ensures compatibility with deployment platforms that require health checks.

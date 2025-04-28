@@ -4,6 +4,7 @@ from telegram import Bot, Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from scrape_links import get_latest_canva_link
 from config import BOT_TOKEN, CHANNEL_ID, BOT_ADMIN_ID
+from aiohttp import web
 
 # Configure logging
 logging.basicConfig(
@@ -63,6 +64,18 @@ async def post_latest_link():
             await bot.send_message(chat_id=BOT_ADMIN_ID, text=error_message)
         await asyncio.sleep(300)  # Check every 5 minutes
 
+# Add a simple HTTP server for health checks
+async def health_check(request):
+    return web.Response(text="OK")
+
+async def start_health_check_server():
+    app = web.Application()
+    app.router.add_get("/health", health_check)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", 8080)
+    await site.start()
+
 async def main():
     application = ApplicationBuilder().token(BOT_TOKEN).build()
 
@@ -72,6 +85,9 @@ async def main():
     # Initialize and start the application
     await application.initialize()
     await application.start()
+
+    # Start the health check server
+    health_check_task = asyncio.create_task(start_health_check_server())
 
     # Run the link posting loop in the background
     link_task = asyncio.create_task(post_latest_link())
@@ -87,8 +103,10 @@ async def main():
         await application.updater.stop()
         await application.stop()
         link_task.cancel()
+        health_check_task.cancel()
         try:
             await link_task
+            await health_check_task
         except asyncio.CancelledError:
             pass
         await application.shutdown()
