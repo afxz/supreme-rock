@@ -1,9 +1,7 @@
 import aiohttp
 import asyncio
-import requests
 from bs4 import BeautifulSoup
 import random
-import time
 
 # List of User-Agent strings to rotate
 USER_AGENTS = [
@@ -48,7 +46,6 @@ async def get_latest_canva_link():
 
                     canva_link = canva_button['href']
                     return canva_link
-
         except Exception as e:
             print(f"Error: {e}")
             # Retry with exponential backoff
@@ -57,6 +54,8 @@ async def get_latest_canva_link():
 
 if __name__ == "__main__":
     try:
-        asyncio.run(get_latest_canva_link())
+        canva_link = asyncio.run(get_latest_canva_link())
+        if canva_link:
+            print(canva_link)
     except Exception as e:
         print(f"Error: {e}")
