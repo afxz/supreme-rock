@@ -60,12 +60,12 @@ def main():
                     await application.bot.send_message(
                         chat_id=CHANNEL_ID,
                         text=(
-                            f"✅ **New Canva Link:**\n"
+                            f"✅ <b>New Canva Link:</b>\n"
                             f"{latest_link}\n\n"
-                            f"🔔 *Unmute this channel to get access before others!* ⏩\n\n"
-                            f"⚡ _Powered by_ [@CanvaProInviteLinks](https://t.me/CanvaProInviteLinks)"
+                            f"🔔 <i>Unmute this channel to get access before others!</i> ⏩\n"
+                            f"⚡ <i>Powered by @CanvaProInviteLinks</i>"
                         ),
-                        parse_mode="MarkdownV2"
+                        parse_mode="HTML"
                     )
                     logger.info(f"Posted new link: {latest_link}")
 
