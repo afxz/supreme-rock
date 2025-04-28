@@ -1,6 +1,7 @@
 from telegram.ext import Application, CommandHandler
 import logging
 from config import BOT_TOKEN, ADMIN_GROUP_ID
+from link_checker import last_checked_time, last_posted_link
 
 logger = logging.getLogger()
 
