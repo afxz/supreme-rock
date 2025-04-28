@@ -3,6 +3,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 import requests
 import time
 import logging
+import asyncio
 
 logger = logging.getLogger()
 
@@ -27,11 +28,11 @@ def start_health_check_server():
     logger.info("Health check server started on port 80")
     threading.Thread(target=server.serve_forever, daemon=True).start()
 
-def self_ping():
+async def self_ping():
     while True:
         try:
-            requests.get("http://0.0.0.0")
+            await asyncio.to_thread(requests.get, "http://0.0.0.0")
             logger.info("Self-ping successful.")
         except Exception as e:
             logger.error(f"Self-ping failed: {e}")
-        time.sleep(240)  # Ping every 4 minutes
+        await asyncio.sleep(240)  # Ping every 4 minutes
