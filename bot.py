@@ -3,6 +3,7 @@ import time
 import logging
 from scrape_links import get_latest_canva_link
 from config import BOT_TOKEN, CHANNEL_ID, ADMIN_ID
+import asyncio
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
@@ -12,25 +13,25 @@ logger = logging.getLogger()
 last_checked_time = None
 last_posted_link = None
 
-def start(update, context):
+async def start(update, context):
     if update.effective_user.id == ADMIN_ID:
-        update.message.reply_text("Bot is running and ready to post Canva links!")
+        await update.message.reply_text("Bot is running and ready to post Canva links!")
     else:
-        update.message.reply_text("You are not authorized to use this command.")
+        await update.message.reply_text("You are not authorized to use this command.")
 
-def status(update, context):
+async def status(update, context):
     if update.effective_user.id == ADMIN_ID:
         status_message = (
             f"Last Checked Time: {last_checked_time}\n"
             f"Last Posted Link: {last_posted_link if last_posted_link else 'No link posted yet.'}"
         )
-        update.message.reply_text(status_message)
+        await update.message.reply_text(status_message)
     else:
-        update.message.reply_text("You are not authorized to use this command.")
+        await update.message.reply_text("You are not authorized to use this command.")
 
-def notify_admin(bot, message):
+async def notify_admin(bot, message):
     try:
-        bot.send_message(chat_id=ADMIN_ID, text=message)
+        await bot.send_message(chat_id=ADMIN_ID, text=message)
     except Exception as e:
         logger.error(f"Failed to notify admin: {e}")
 
@@ -44,7 +45,7 @@ def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("status", status))
 
-    def check_links():
+    async def check_links():
         global last_checked_time, last_posted_link
 
         while True:
@@ -56,24 +57,23 @@ def main():
                 # Check if the link is new
                 if latest_link != last_posted_link:
                     # Post the link to the Telegram channel
-                    application.bot.send_message(chat_id=CHANNEL_ID, text=f"✅ New Canva link: {latest_link}")
+                    await application.bot.send_message(chat_id=CHANNEL_ID, text=f"✅ New Canva link: {latest_link}")
                     logger.info(f"Posted new link: {latest_link}")
 
                     # Update the last posted link
                     last_posted_link = latest_link
 
                 # Wait before checking again
-                time.sleep(300)  # Check every 5 minutes
+                await asyncio.sleep(300)  # Check every 5 minutes
 
             except Exception as e:
                 error_message = f"Error: {e}"
                 logger.error(error_message)
-                application.bot.send_message(chat_id=ADMIN_ID, text=error_message)
-                time.sleep(60)  # Wait 1 minute before retrying
+                await application.bot.send_message(chat_id=ADMIN_ID, text=error_message)
+                await asyncio.sleep(60)  # Wait 1 minute before retrying
 
-    # Start the link-checking loop in a separate thread
-    from threading import Thread
-    Thread(target=check_links, daemon=True).start()
+    # Start the link-checking loop in the main event loop
+    asyncio.run(check_links())
 
     # Start the bot
     application.run_polling()
