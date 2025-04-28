@@ -1,10 +1,14 @@
-# Configuration file for the bot
+from dotenv import load_dotenv
+import os
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Telegram bot token
-BOT_TOKEN = "8067304564:AAHQxBcZlCo1wXsH5MvuSgeQ8XMn7JX-qz4"
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-# Telegram channel ID (replace with your channel's ID)
-CHANNEL_ID = "@CanvaProInviteLinks"
+# Telegram channel ID
+CHANNEL_ID = os.getenv("CHANNEL_ID")
 
 # Admin group ID for bot control
-ADMIN_GROUP_ID = -1002047073544
+ADMIN_GROUP_ID = int(os.getenv("ADMIN_GROUP_ID"))

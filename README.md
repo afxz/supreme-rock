@@ -39,6 +39,17 @@ This project scrapes Canva links from a specific webpage and posts updates to a 
    python bot.py
    ```
 
+## Environment Variables
+This project uses a `.env` file to store sensitive information. Create a `.env` file in the root directory with the following variables:
+
+```
+BOT_TOKEN=your-bot-token-here
+CHANNEL_ID=@your-channel-id-here
+ADMIN_GROUP_ID=-1001234567890
+```
+
+Make sure to replace the placeholders with your actual values.
+
 ## Deployment
 This project can be deployed on platforms like Koyeb. Ensure the environment variables for the bot token, channel ID, and admin group ID are set correctly.
 
