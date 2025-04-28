@@ -19,3 +19,6 @@ CHANNEL_ID = validate_env_var("CHANNEL_ID")
 
 # Admin group ID for bot control
 ADMIN_GROUP_ID = int(validate_env_var("ADMIN_GROUP_ID"))
+
+# Bot admin ID
+BOT_ADMIN_ID = int(validate_env_var("BOT_ADMIN_ID"))

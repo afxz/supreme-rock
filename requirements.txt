@@ -3,5 +3,3 @@ requests
 python-telegram-bot==20.3
 python-dotenv
 aiohttp
-loguru
-nest_asyncio
