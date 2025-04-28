@@ -1,4 +1,4 @@
-from telegram.ext import Updater, CommandHandler
+from telegram.ext import Application, CommandHandler
 import time
 import logging
 from scrape_links import get_latest_canva_link
@@ -37,14 +37,12 @@ def notify_admin(bot, message):
 def main():
     global last_checked_time, last_posted_link
 
-    updater = Updater(token=BOT_TOKEN, use_context=True)
-    dispatcher = updater.dispatcher
+    # Initialize the bot application
+    application = Application.builder().token(BOT_TOKEN).build()
 
     # Add command handlers
-    dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(CommandHandler("status", status))
-
-    bot = updater.bot
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("status", status))
 
     def check_links():
         global last_checked_time, last_posted_link
@@ -58,7 +56,7 @@ def main():
                 # Check if the link is new
                 if latest_link != last_posted_link:
                     # Post the link to the Telegram channel
-                    bot.send_message(chat_id=CHANNEL_ID, text=f"✅ New Canva link: {latest_link}")
+                    application.bot.send_message(chat_id=CHANNEL_ID, text=f"✅ New Canva link: {latest_link}")
                     logger.info(f"Posted new link: {latest_link}")
 
                     # Update the last posted link
@@ -70,7 +68,7 @@ def main():
             except Exception as e:
                 error_message = f"Error: {e}"
                 logger.error(error_message)
-                notify_admin(bot, error_message)
+                application.bot.send_message(chat_id=ADMIN_ID, text=error_message)
                 time.sleep(60)  # Wait 1 minute before retrying
 
     # Start the link-checking loop in a separate thread
@@ -78,8 +76,7 @@ def main():
     Thread(target=check_links, daemon=True).start()
 
     # Start the bot
-    updater.start_polling()
-    updater.idle()
+    application.run_polling()
 
 if __name__ == "__main__":
     main()
