@@ -1,13 +1,12 @@
 import asyncio
-import logging
 from health_check import start_health_check_server, self_ping
 from link_checker import check_links
 from telegram_bot import create_bot_application, start, status
 from telegram.ext import CommandHandler
+from loguru import logger
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
-logger = logging.getLogger()
+# Configure loguru for structured logging
+logger.add("bot.log", rotation="10 MB", retention="7 days", level="INFO")
 
 def main():
     # Start the health check server

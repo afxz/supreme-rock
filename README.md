@@ -51,6 +51,14 @@ ADMIN_GROUP_ID=-1001234567890
 
 Make sure to replace the placeholders with your actual values.
 
+## Environment Variable Validation
+The bot validates the following environment variables at startup to ensure they are correctly configured:
+- `BOT_TOKEN`: The Telegram bot token.
+- `CHANNEL_ID`: The Telegram channel ID.
+- `ADMIN_GROUP_ID`: The admin group ID for bot control.
+
+If any of these variables are missing or invalid, the bot will raise an error and exit.
+
 ## Deployment
 This project can be deployed on platforms like Koyeb. Ensure the environment variables for the bot token, channel ID, and admin group ID are set correctly.
 
