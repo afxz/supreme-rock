@@ -1,37 +1,85 @@
+from telegram.ext import Updater, CommandHandler
 import time
 import logging
-from telegram import Bot
 from scrape_links import get_latest_canva_link
-from config import BOT_TOKEN, CHANNEL_ID
+from config import BOT_TOKEN, CHANNEL_ID, ADMIN_ID
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger()
 
+# Global variables to track bot status
+last_checked_time = None
+last_posted_link = None
+
+def start(update, context):
+    if update.effective_user.id == ADMIN_ID:
+        update.message.reply_text("Bot is running and ready to post Canva links!")
+    else:
+        update.message.reply_text("You are not authorized to use this command.")
+
+def status(update, context):
+    if update.effective_user.id == ADMIN_ID:
+        status_message = (
+            f"Last Checked Time: {last_checked_time}\n"
+            f"Last Posted Link: {last_posted_link if last_posted_link else 'No link posted yet.'}"
+        )
+        update.message.reply_text(status_message)
+    else:
+        update.message.reply_text("You are not authorized to use this command.")
+
+def notify_admin(bot, message):
+    try:
+        bot.send_message(chat_id=ADMIN_ID, text=message)
+    except Exception as e:
+        logger.error(f"Failed to notify admin: {e}")
+
 def main():
-    bot = Bot(token=BOT_TOKEN)
-    last_posted_link = None
+    global last_checked_time, last_posted_link
 
-    while True:
-        try:
-            # Get the latest Canva link
-            latest_link = get_latest_canva_link()
+    updater = Updater(token=BOT_TOKEN, use_context=True)
+    dispatcher = updater.dispatcher
 
-            # Check if the link is new
-            if latest_link != last_posted_link:
-                # Post the link to the Telegram channel
-                bot.send_message(chat_id=CHANNEL_ID, text=f"✅ New Canva link: {latest_link}")
-                logger.info(f"Posted new link: {latest_link}")
+    # Add command handlers
+    dispatcher.add_handler(CommandHandler("start", start))
+    dispatcher.add_handler(CommandHandler("status", status))
 
-                # Update the last posted link
-                last_posted_link = latest_link
+    bot = updater.bot
 
-            # Wait before checking again
-            time.sleep(300)  # Check every 5 minutes
+    def check_links():
+        global last_checked_time, last_posted_link
 
-        except Exception as e:
-            logger.error(f"Error: {e}")
-            time.sleep(60)  # Wait 1 minute before retrying
+        while True:
+            try:
+                # Get the latest Canva link
+                latest_link = get_latest_canva_link()
+                last_checked_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+
+                # Check if the link is new
+                if latest_link != last_posted_link:
+                    # Post the link to the Telegram channel
+                    bot.send_message(chat_id=CHANNEL_ID, text=f"✅ New Canva link: {latest_link}")
+                    logger.info(f"Posted new link: {latest_link}")
+
+                    # Update the last posted link
+                    last_posted_link = latest_link
+
+                # Wait before checking again
+                time.sleep(300)  # Check every 5 minutes
+
+            except Exception as e:
+                error_message = f"Error: {e}"
+                logger.error(error_message)
+                notify_admin(bot, error_message)
+                time.sleep(60)  # Wait 1 minute before retrying
+
+    # Start the link-checking loop in a separate thread
+    from threading import Thread
+    Thread(target=check_links, daemon=True).start()
+
+    # Start the bot
+    updater.start_polling()
+    updater.idle()
 
 if __name__ == "__main__":
     main()
