@@ -4,4 +4,4 @@
 BOT_TOKEN = "8067304564:AAHQxBcZlCo1wXsH5MvuSgeQ8XMn7JX-qz4"
 
 # Telegram channel ID (replace with your channel's ID)
-CHANNEL_ID = "@CanovaRobot"
+CHANNEL_ID = "@CanvaProInviteLinks"
