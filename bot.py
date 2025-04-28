@@ -55,7 +55,7 @@ def main():
                 last_checked_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
 
                 # Check if the link is new
-                if latest_link != last_posted_link:
+                if latest_link and latest_link != last_posted_link:
                     # Post the link to the Telegram channel
                     await application.bot.send_message(
                         chat_id=CHANNEL_ID,
@@ -71,6 +71,9 @@ def main():
 
                     # Update the last posted link
                     last_posted_link = latest_link
+
+                else:
+                    logger.info("No new link found or duplicate link detected.")
 
                 # Wait before checking again
                 await asyncio.sleep(300)  # Check every 5 minutes

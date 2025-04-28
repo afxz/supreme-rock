@@ -13,6 +13,7 @@ This project scrapes Canva links from a specific webpage and posts updates to a 
 - The bot scrapes the "Download" button link from the main page and follows it to find the Canva link.
 - It keeps track of the last posted link in memory to ensure it doesn't repost the same link.
 - The bot does not read channel messages; it relies on its internal tracking.
+- If the latest link is the same as the last posted link, it will not post it again, preventing duplicate posts.
 
 ## Admin Features
 - `/start`: Initialize the bot (admin group only).
@@ -63,3 +64,7 @@ This project can be deployed on platforms like Koyeb. Ensure the environment var
    ```bash
    docker run -d --name canva-bot -e BOT_TOKEN=<your-bot-token> -e CHANNEL_ID=<your-channel-id> -e ADMIN_GROUP_ID=<your-admin-group-id> canva-bot
    ```
+
+## Common Issues and Fixes
+- **Duplicate Links Posted**: This issue occurs if the bot fails to track the last posted link properly. The latest update ensures that the bot only posts new or updated links.
+- **Error Notifications**: Any errors encountered during execution are sent to the admin group for quick resolution.
