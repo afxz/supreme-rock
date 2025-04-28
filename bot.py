@@ -6,6 +6,7 @@ from config import BOT_TOKEN, CHANNEL_ID, ADMIN_GROUP_ID
 import asyncio
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
+import requests
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
@@ -22,9 +23,22 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b"OK")
 
+    def do_HEAD(self):
+        self.send_response(200)
+        self.end_headers()
+
 def start_health_check_server():
-    server = HTTPServer(("0.0.0.0", 8080), HealthCheckHandler)
+    server = HTTPServer(("0.0.0.0", 80), HealthCheckHandler)  # Changed port to 80
     threading.Thread(target=server.serve_forever, daemon=True).start()
+
+def self_ping():
+    while True:
+        try:
+            requests.get("http://0.0.0.0")  # Updated to target port 80
+            logger.info("Self-ping successful.")
+        except Exception as e:
+            logger.error(f"Self-ping failed: {e}")
+        time.sleep(240)  # Ping every 4 minutes
 
 async def start(update, context):
     if update.effective_chat.id == ADMIN_GROUP_ID:
@@ -53,6 +67,9 @@ def main():
 
     # Start the health check server
     start_health_check_server()
+
+    # Start the self-ping mechanism
+    threading.Thread(target=self_ping, daemon=True).start()
 
     # Initialize the bot application
     application = Application.builder().token(BOT_TOKEN).build()
