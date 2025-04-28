@@ -6,5 +6,5 @@ BOT_TOKEN = "8067304564:AAHQxBcZlCo1wXsH5MvuSgeQ8XMn7JX-qz4"
 # Telegram channel ID (replace with your channel's ID)
 CHANNEL_ID = "@CanvaProInviteLinks"
 
-# Admin ID for bot control
-ADMIN_ID = 7068007001
+# Admin group ID for bot control
+ADMIN_GROUP_ID = -1002047073544

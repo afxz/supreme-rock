@@ -2,7 +2,7 @@ from telegram.ext import Application, CommandHandler
 import time
 import logging
 from scrape_links import get_latest_canva_link
-from config import BOT_TOKEN, CHANNEL_ID, ADMIN_ID
+from config import BOT_TOKEN, CHANNEL_ID, ADMIN_GROUP_ID
 import asyncio
 
 # Configure logging
@@ -14,26 +14,26 @@ last_checked_time = None
 last_posted_link = None
 
 async def start(update, context):
-    if update.effective_user.id == ADMIN_ID:
-        await update.message.reply_text("Bot is running and ready to post Canva links!")
+    if update.effective_chat.id == ADMIN_GROUP_ID:
+        await context.bot.send_message(chat_id=ADMIN_GROUP_ID, text="Bot is running and ready to post Canva links!")
     else:
-        await update.message.reply_text("You are not authorized to use this command.")
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="This command is restricted to the admin group.")
 
 async def status(update, context):
-    if update.effective_user.id == ADMIN_ID:
+    if update.effective_chat.id == ADMIN_GROUP_ID:
         status_message = (
             f"Last Checked Time: {last_checked_time}\n"
             f"Last Posted Link: {last_posted_link if last_posted_link else 'No link posted yet.'}"
         )
-        await update.message.reply_text(status_message)
+        await context.bot.send_message(chat_id=ADMIN_GROUP_ID, text=status_message)
     else:
-        await update.message.reply_text("You are not authorized to use this command.")
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="This command is restricted to the admin group.")
 
 async def notify_admin(bot, message):
     try:
-        await bot.send_message(chat_id=ADMIN_ID, text=message)
+        await bot.send_message(chat_id=ADMIN_GROUP_ID, text=message)
     except Exception as e:
-        logger.error(f"Failed to notify admin: {e}")
+        logger.error(f"Failed to notify admin group: {e}")
 
 def main():
     global last_checked_time, last_posted_link
@@ -69,7 +69,7 @@ def main():
             except Exception as e:
                 error_message = f"Error: {e}"
                 logger.error(error_message)
-                await application.bot.send_message(chat_id=ADMIN_ID, text=error_message)
+                await application.bot.send_message(chat_id=ADMIN_GROUP_ID, text=error_message)
                 await asyncio.sleep(60)  # Wait 1 minute before retrying
 
     # Start the link-checking loop in the main event loop
