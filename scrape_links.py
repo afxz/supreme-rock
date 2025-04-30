@@ -11,7 +11,11 @@ USER_AGENTS = [
     "Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1"
 ]
 
-async def get_latest_canva_link():
+# Add a retry limit to prevent infinite recursion
+async def get_latest_canva_link(retry_count=0, max_retries=5):
+    if retry_count >= max_retries:
+        raise Exception("Maximum retry limit reached while fetching Canva link.")
+
     # Step 1: Scrape the "Download" button link from the main page
     main_url = "https://bingotingo.com/best-social-media-platforms/"
     headers = {"User-Agent": random.choice(USER_AGENTS)}
@@ -39,7 +43,6 @@ async def get_latest_canva_link():
                         raise Exception(f"Failed to fetch the redirected page: {response.status}")
 
                     soup = BeautifulSoup(await response.text(), 'html.parser')
-                    # Update to find the Canva link based on its URL pattern
                     canva_button = soup.find('a', href=lambda href: href and href.startswith('https://www.canva.com/brand/'))
                     if not canva_button:
                         raise Exception("Canva link not found on the redirected page")
@@ -50,7 +53,7 @@ async def get_latest_canva_link():
             print(f"Error: {e}")
             # Retry with exponential backoff
             await asyncio.sleep(random.uniform(2, 5))
-            return await get_latest_canva_link()
+            return await get_latest_canva_link(retry_count + 1, max_retries)
 
 if __name__ == "__main__":
     try:

@@ -18,6 +18,8 @@ This project scrapes Canva links from a specific webpage and posts updates to a 
 ## Admin Features
 - `/start`: Initialize the bot (admin group only).
 - `/status`: Check the last time the bot checked for links and the latest link it found (admin group only).
+- `/restart`: Restart the bot server (admin group only).
+- `/logs`: Fetch the last 20 lines of logs (admin group only).
 - Error notifications: The bot sends error messages to the admin group.
 
 ## Setup
@@ -73,20 +75,3 @@ This project is now deployable on Koyeb. Follow these steps to deploy:
 
 ### Health Check
 - The bot includes a health check endpoint at `/health` on port `8080`. Koyeb will use this endpoint to verify that the bot is running.
-
-### Docker Deployment (Optional)
-If you prefer to use Docker, follow these steps:
-
-1. **Build the Docker Image**
-   ```bash
-   docker build -t canva-bot .
-   ```
-
-2. **Run the Docker Container**
-   ```bash
-   docker run -d --name canva-bot -e BOT_TOKEN=<your-bot-token> -e CHANNEL_ID=<your-channel-id> -e ADMIN_GROUP_ID=<your-admin-group-id> -p 8080:8080 canva-bot
-   ```
-
-## Common Issues and Fixes
-- **Duplicate Links Posted**: This issue occurs if the bot fails to track the last posted link properly. The latest update ensures that the bot only posts new or updated links.
-- **Error Notifications**: Any errors encountered during execution are sent to the admin group for quick resolution.

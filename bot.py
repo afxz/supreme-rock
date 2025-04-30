@@ -5,6 +5,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from scrape_links import get_latest_canva_link
 from config import BOT_TOKEN, CHANNEL_ID, BOT_ADMIN_ID
 from aiohttp import web
+import os
 
 # Configure logging
 logging.basicConfig(
@@ -35,6 +36,32 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(status_message)
     else:
         logger.warning("Unauthorized /status command attempt.")
+        await update.message.reply_text("You are not authorized to use this command.")
+
+# Function to restart the bot server
+async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id == BOT_ADMIN_ID:
+        logger.info("/restart command received from admin.")
+        await update.message.reply_text("Restarting the bot server...")
+        os._exit(1)  # Exit the process to trigger a restart
+    else:
+        logger.warning("Unauthorized /restart command attempt.")
+        await update.message.reply_text("You are not authorized to use this command.")
+
+# Function to fetch recent logs
+async def logs(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id == BOT_ADMIN_ID:
+        logger.info("/logs command received from admin.")
+        try:
+            with open("bot.log", "r") as log_file:
+                log_lines = log_file.readlines()
+                recent_logs = "\n".join(log_lines[-20:])  # Fetch the last 20 lines
+                await update.message.reply_text(f"Recent Logs:\n{recent_logs}")
+        except Exception as e:
+            logger.error(f"Error reading logs: {e}")
+            await update.message.reply_text("Failed to fetch logs.")
+    else:
+        logger.warning("Unauthorized /logs command attempt.")
         await update.message.reply_text("You are not authorized to use this command.")
 
 async def post_latest_link():
@@ -81,6 +108,8 @@ async def main():
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("status", status))
+    application.add_handler(CommandHandler("restart", restart))
+    application.add_handler(CommandHandler("logs", logs))
 
     # Initialize and start the application
     await application.initialize()
