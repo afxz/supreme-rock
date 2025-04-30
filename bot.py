@@ -7,10 +7,14 @@ from config import BOT_TOKEN, CHANNEL_ID, BOT_ADMIN_ID
 from aiohttp import web
 import os
 
-# Configure logging
+# Update logging configuration to write logs to a file
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
+    level=logging.INFO,
+    handlers=[
+        logging.FileHandler("bot.log"),
+        logging.StreamHandler()
+    ]
 )
 logger = logging.getLogger(__name__)
 
