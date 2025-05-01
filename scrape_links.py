@@ -43,7 +43,7 @@ def get_stealth_headers():
     }
 
 # Main scraper function
-async def get_latest_canva_link(retries=3):
+async def get_latest_canva_link(retries=3, use_proxy=True):
     main_url = "https://bingotingo.com/best-social-media-platforms/"
     # Disable SSL verify (Codespaces friendly)
     ctx = ssl.create_default_context()
@@ -52,14 +52,14 @@ async def get_latest_canva_link(retries=3):
     connector = aiohttp.TCPConnector(limit=5, ssl=ctx)
 
     # Prepare proxies and headers
-    proxies = await fetch_free_proxies()
+    proxies = await fetch_free_proxies() if use_proxy else []
     proxy = random.choice(proxies) if proxies else None
 
     async with aiohttp.ClientSession(connector=connector) as session:
         try:
             # Step 1: fetch main page
             headers = get_stealth_headers()
-            resp1 = await session.get(main_url, headers=headers, proxy=proxy)
+            resp1 = await session.get(main_url, headers=headers, proxy=proxy if use_proxy and proxy else None)
             resp1.raise_for_status()
             soup1 = BeautifulSoup(await resp1.text(), 'html.parser')
             download_btn = soup1.select_one('a.su-button')
@@ -70,7 +70,7 @@ async def get_latest_canva_link(retries=3):
 
             # Step 2: fetch redirect page
             headers = get_stealth_headers()
-            resp2 = await session.get(latest_link, headers=headers, proxy=proxy)
+            resp2 = await session.get(latest_link, headers=headers, proxy=proxy if use_proxy and proxy else None)
             resp2.raise_for_status()
             soup2 = BeautifulSoup(await resp2.text(), 'html.parser')
             canva_btn = soup2.find('a', href=lambda h: h and h.startswith('https://www.canva.com/brand/'))
@@ -82,7 +82,7 @@ async def get_latest_canva_link(retries=3):
             if retries > 0:
                 wait = random.uniform(2, 5)
                 await asyncio.sleep(wait)
-                return await get_latest_canva_link(retries - 1)
+                return await get_latest_canva_link(retries - 1, use_proxy=use_proxy)
             else:
                 raise
 

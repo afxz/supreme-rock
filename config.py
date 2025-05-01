@@ -22,3 +22,6 @@ ADMIN_GROUP_ID = int(validate_env_var("ADMIN_GROUP_ID"))
 
 # Bot admin ID
 BOT_ADMIN_ID = int(validate_env_var("BOT_ADMIN_ID"))
+
+# Add a path for important events log
+IMPORTANT_LOG_PATH = "important.log"
