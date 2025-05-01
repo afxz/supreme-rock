@@ -176,3 +176,8 @@
 2025-05-01 11:15:59,829 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8067304564:AAG-18-z5D_A_wyRod7A1WlSTxFVMZZVMB4/getUpdates "HTTP/1.1 200 OK"
 2025-05-01 11:16:09,998 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8067304564:AAG-18-z5D_A_wyRod7A1WlSTxFVMZZVMB4/getUpdates "HTTP/1.1 200 OK"
 2025-05-01 11:16:20,164 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8067304564:AAG-18-z5D_A_wyRod7A1WlSTxFVMZZVMB4/getUpdates "HTTP/1.1 200 OK"
+2025-05-01 11:16:30,330 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8067304564:AAG-18-z5D_A_wyRod7A1WlSTxFVMZZVMB4/getUpdates "HTTP/1.1 200 OK"
+2025-05-01 11:16:40,498 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8067304564:AAG-18-z5D_A_wyRod7A1WlSTxFVMZZVMB4/getUpdates "HTTP/1.1 200 OK"
+2025-05-01 11:16:47,448 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8067304564:AAG-18-z5D_A_wyRod7A1WlSTxFVMZZVMB4/getUpdates "HTTP/1.1 200 OK"
+2025-05-01 11:16:48,216 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8067304564:AAG-18-z5D_A_wyRod7A1WlSTxFVMZZVMB4/sendMessage "HTTP/1.1 200 OK"
+2025-05-01 11:16:48,911 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8067304564:AAG-18-z5D_A_wyRod7A1WlSTxFVMZZVMB4/sendMessage "HTTP/1.1 200 OK"
