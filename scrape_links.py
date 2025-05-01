@@ -1,8 +1,8 @@
 import aiohttp
 import asyncio
-from bs4 import BeautifulSoup
 import random
 import ssl
+from bs4 import BeautifulSoup
 
 # List of rotating user agents
 USER_AGENTS = [
@@ -12,72 +12,84 @@ USER_AGENTS = [
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
 ]
 
+# Fetch a list of free HTTPS proxies
+async def fetch_free_proxies():
+    url = "https://free-proxy-list.net/"
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as resp:
+            text = await resp.text()
+    soup = BeautifulSoup(text, 'html.parser')
+    rows = soup.select("#proxylisttable tbody tr")
+    proxies = []
+    for row in rows:
+        cols = row.find_all('td')
+        ip, port, https = cols[0].text.strip(), cols[1].text.strip(), cols[6].text.strip()
+        if https.lower() == 'yes':
+            proxies.append(f"http://{ip}:{port}")
+    return proxies
+
+# Build stealth headers
 def get_stealth_headers():
     return {
         "User-Agent": random.choice(USER_AGENTS),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
         "Referer": "https://www.google.com/",
-        "Accept-Encoding": "identity",  # No encoding
         "Connection": "keep-alive",
-        "DNT": "1",  # Do Not Track
+        "DNT": "1",
         "Upgrade-Insecure-Requests": "1",
-        "TE": "Trailers",  # Some websites check for this
         "Cache-Control": "max-age=0",
-        "Pragma": "no-cache",  # No cache headers
-        "Origin": "https://www.google.com/"
+        "Pragma": "no-cache"
     }
 
-
-async def get_latest_canva_link():
+# Main scraper function
+async def get_latest_canva_link(retries=3):
     main_url = "https://bingotingo.com/best-social-media-platforms/"
-    sslcontext = ssl.create_default_context()
-    
-    connector = aiohttp.TCPConnector(limit_per_host=2, ssl=sslcontext)
+    # Disable SSL verify (Codespaces friendly)
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    connector = aiohttp.TCPConnector(limit=5, ssl=ctx)
+
+    # Prepare proxies and headers
+    proxies = await fetch_free_proxies()
+    proxy = random.choice(proxies) if proxies else None
 
     async with aiohttp.ClientSession(connector=connector) as session:
         try:
-            # Step 1: Get main page
+            # Step 1: fetch main page
             headers = get_stealth_headers()
-            async with session.get(main_url, headers=headers) as response:
-                if response.status != 200:
-                    raise Exception(f"Failed to fetch the main page: {response.status}")
-                
-                soup = BeautifulSoup(await response.text(), 'html.parser')
-                download_button = soup.find('a', class_='su-button')
-                if not download_button:
-                    raise Exception("Download button not found on the main page")
+            resp1 = await session.get(main_url, headers=headers, proxy=proxy)
+            resp1.raise_for_status()
+            soup1 = BeautifulSoup(await resp1.text(), 'html.parser')
+            download_btn = soup1.select_one('a.su-button')
+            if not download_btn:
+                raise Exception("Download button not found on main page")
+            latest_link = download_btn['href']
+            await asyncio.sleep(random.uniform(1.0, 2.5))
 
-                latest_link = download_button['href']
-
-                # Human-like delay
-                await asyncio.sleep(random.uniform(1.2, 2.8))
-
-            # Step 2: Get redirected page
+            # Step 2: fetch redirect page
             headers = get_stealth_headers()
-            async with session.get(latest_link, headers=headers) as response:
-                if response.status != 200:
-                    raise Exception(f"Failed to fetch the redirected page: {response.status}")
-
-                soup = BeautifulSoup(await response.text(), 'html.parser')
-                canva_button = soup.find('a', href=lambda href: href and href.startswith('https://www.canva.com/brand/'))
-                if not canva_button:
-                    raise Exception("Canva link not found on the redirected page")
-
-                return canva_button['href']
+            resp2 = await session.get(latest_link, headers=headers, proxy=proxy)
+            resp2.raise_for_status()
+            soup2 = BeautifulSoup(await resp2.text(), 'html.parser')
+            canva_btn = soup2.find('a', href=lambda h: h and h.startswith('https://www.canva.com/brand/'))
+            if not canva_btn:
+                raise Exception("Canva link not found on redirected page")
+            return canva_btn['href']
 
         except Exception as e:
-            print(f"[Error] {e}")
-            # Retry with exponential backoff
-            await asyncio.sleep(random.uniform(2, 5))
-            return await get_latest_canva_link()
+            if retries > 0:
+                wait = random.uniform(2, 5)
+                await asyncio.sleep(wait)
+                return await get_latest_canva_link(retries - 1)
+            else:
+                raise
 
+# Entry point
 if __name__ == "__main__":
     try:
-        canva_link = asyncio.run(get_latest_canva_link())
-        if canva_link:
-            print(f"✅ Canva Link: {canva_link}")
-        else:
-            print("❌ No link found.")
+        link = asyncio.run(get_latest_canva_link())
+        print(f"✅ Canva Link: {link}")
     except Exception as e:
         print(f"🔥 Fatal Error: {e}")
