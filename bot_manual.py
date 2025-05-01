@@ -150,9 +150,13 @@ async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def health_check(request):
     return web.Response(text="OK")
 
+async def root_check(request):
+    return web.Response(text="OK")
+
 async def start_health_check_server():
     app = web.Application()
     app.router.add_get("/health", health_check)
+    app.router.add_get("/", root_check)
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", 8080)
