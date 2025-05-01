@@ -21,6 +21,19 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# --- Log auto-truncation on startup ---
+LOG_FILES = ["bot.log", "important.log"]
+MAX_LOG_LINES = 1000
+for log_file in LOG_FILES:
+    try:
+        with open(log_file, "r") as f:
+            lines = f.readlines()
+        if len(lines) > MAX_LOG_LINES:
+            with open(log_file, "w") as f:
+                f.writelines(lines[-MAX_LOG_LINES:])
+    except FileNotFoundError:
+        pass
+
 # Initialize the bot
 bot = Bot(token=BOT_TOKEN)
 
