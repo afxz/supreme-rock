@@ -4,3 +4,5 @@ python-telegram-bot==20.3
 python-dotenv
 aiohttp
 brotli
+APScheduler
+pytz
