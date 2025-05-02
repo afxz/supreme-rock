@@ -12,6 +12,7 @@ import os
 import schedule
 import pytz
 from datetime import datetime, timedelta
+from bot import post_latest_link
 
 # Update logging configuration to write logs to a file
 logging.basicConfig(
@@ -188,6 +189,29 @@ def schedule_posting():
     for start_hour, end_hour in slots:
         post_time = random_time_in_slot(start_hour, end_hour)
         schedule.every().day.at(post_time.strftime('%H:%M')).do(asyncio.run, post_latest_link())
+
+# Function to post the latest Canva link
+async def post_latest_link():
+    global last_posted_link
+    try:
+        logger.info("Checking for the latest Canva link...")
+        latest_link = await get_latest_canva_link()
+        if latest_link and latest_link != last_posted_link:
+            logger.info(f"New link found: {latest_link}")
+            message = (
+                f"✅ <b>New Canva Link:</b>\n"
+                f"{latest_link}\n\n"
+                f"🔔 Unmute this channel to get access before others! ⏩\n"
+                f"⚡ <i>Powered by @CanvaProInviteLinks</i>"
+            )
+            await bot.send_message(chat_id=CHANNEL_ID, text=message, parse_mode="HTML")
+            last_posted_link = latest_link
+        else:
+            logger.info("No new link found.")
+    except Exception as e:
+        logger.error(f"Error occurred while posting link: {e}")
+        error_message = f"Error occurred while posting link: {e}"
+        await bot.send_message(chat_id=BOT_ADMIN_ID, text=error_message)
 
 # Optimized scheduling loop
 async def optimized_schedule_runner():
