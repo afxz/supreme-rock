@@ -9,6 +9,9 @@ from scrape_links import get_latest_canva_link
 from config import BOT_TOKEN, CHANNEL_ID, BOT_ADMIN_ID, IMPORTANT_LOG_PATH
 from aiohttp import web
 import os
+import schedule
+import pytz
+from datetime import datetime, timedelta
 
 # Update logging configuration to write logs to a file
 logging.basicConfig(
@@ -162,6 +165,43 @@ async def start_health_check_server():
     site = web.TCPSite(runner, "0.0.0.0", 8080)
     await site.start()
 
+# Define IST timezone
+IST = pytz.timezone('Asia/Kolkata')
+
+# Function to schedule posting at random times within given slots
+def schedule_posting():
+    def random_time_in_slot(start_hour, end_hour):
+        start = datetime.now(IST).replace(hour=start_hour, minute=0, second=0, microsecond=0)
+        end = datetime.now(IST).replace(hour=end_hour, minute=0, second=0, microsecond=0)
+        random_time = start + timedelta(seconds=random.randint(0, int((end - start).total_seconds())))
+        return random_time
+
+    # Schedule tasks for each slot
+    slots = [
+        (4, 6),  # 4 AM to 6 AM
+        (9, 11), # 9 AM to 11 AM
+        (13, 15), # 1 PM to 3 PM
+        (18, 21), # 6 PM to 9 PM
+        (0, 3)   # 12 AM to 3 AM
+    ]
+
+    for start_hour, end_hour in slots:
+        post_time = random_time_in_slot(start_hour, end_hour)
+        schedule.every().day.at(post_time.strftime('%H:%M')).do(asyncio.run, post_latest_link())
+
+# Optimized scheduling loop
+async def optimized_schedule_runner():
+    while True:
+        schedule.run_pending()
+        next_run = schedule.idle_seconds()
+        if next_run is None:
+            # No tasks scheduled, sleep for a default duration
+            await asyncio.sleep(60)
+        else:
+            # Sleep until the next scheduled task
+            await asyncio.sleep(next_run)
+
+# Modify the main function to use the optimized scheduler
 async def main():
     application = ApplicationBuilder().token(BOT_TOKEN).build()
 
@@ -180,17 +220,24 @@ async def main():
     # Start the health check server
     health_check_task = asyncio.create_task(start_health_check_server())
 
+    # Schedule posting tasks
+    schedule_posting()
+
+    # Run the optimized schedule runner
+    schedule_task = asyncio.create_task(optimized_schedule_runner())
+
     try:
         logger.info("Bot is starting polling...")
-        await application.updater.start_polling()
-        await asyncio.Event().wait()
+        await asyncio.Event().wait()  # Keep the bot running indefinitely
     finally:
         logger.info("Shutting down bot...")
         await application.updater.stop()
         await application.stop()
         health_check_task.cancel()
+        schedule_task.cancel()
         try:
             await health_check_task
+            await schedule_task
         except asyncio.CancelledError:
             pass
         await application.shutdown()
