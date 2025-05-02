@@ -150,9 +150,13 @@ async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("You are not authorized to use this command.")
 
-# Add a simple HTTP server for health checks
+# Improved health check endpoint
 async def health_check(request):
-    return web.Response(text="OK")
+    try:
+        return web.Response(text="OK")
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return web.Response(status=500, text="Health check failed")
 
 async def root_check(request):
     return web.Response(text="OK")
@@ -225,7 +229,7 @@ async def optimized_schedule_runner():
             # Sleep until the next scheduled task
             await asyncio.sleep(next_run)
 
-# Modify the main function to use the optimized scheduler
+# Wrap main loop with error handling
 async def main():
     application = ApplicationBuilder().token(BOT_TOKEN).build()
 
@@ -238,21 +242,23 @@ async def main():
     application.add_handler(CommandHandler("restart", restart))
 
     # Initialize and start the application
-    await application.initialize()
-    await application.start()
-
-    # Start the health check server
-    health_check_task = asyncio.create_task(start_health_check_server())
-
-    # Schedule posting tasks
-    schedule_posting()
-
-    # Run the optimized schedule runner
-    schedule_task = asyncio.create_task(optimized_schedule_runner())
-
     try:
+        await application.initialize()
+        await application.start()
+
+        # Start the health check server
+        health_check_task = asyncio.create_task(start_health_check_server())
+
+        # Schedule posting tasks
+        schedule_posting()
+
+        # Run the optimized schedule runner
+        schedule_task = asyncio.create_task(optimized_schedule_runner())
+
         logger.info("Bot is starting polling...")
         await asyncio.Event().wait()  # Keep the bot running indefinitely
+    except Exception as e:
+        logger.error(f"Critical error in main loop: {e}")
     finally:
         logger.info("Shutting down bot...")
         await application.updater.stop()
