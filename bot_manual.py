@@ -108,19 +108,18 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"✅ <b>New Canva Link:</b>\n{latest}\n\n"
                     "🔔 Unmute to access first! ⏩\n"
                     "⚡ <i>Powered by @CanvaProInviteLinks</i>\n"
-                    f"🎯 <b>Goal:</b> Let's hit {random.randint(13, 22)} reactions! 🚀\n"
+                    f"🎯 <b>Reaction Aim:</b> <i>Let's hit {random.randint(11,22)} reactions on this post like YouTubers do! 🚀</i>\n\n"
                 )
-                # Send the main message and get the message_id for the share button
                 sent_msg = await context.bot.send_message(chat_id=CHANNEL_ID, text=msg, parse_mode="HTML")
-                # Add a share button below the post
+                # Add a share button as a regular URL button (not switch_inline_query) for channel compatibility
                 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
                 share_text = (
-                    "🔥 Join @CanvaProInviteLinks for daily fresh Canva Pro team invites Lifetime FREE! "
-                    "Get early access, exclusive drops, and never miss a invite link again!\n"
+                    "🔥 Join @CanvaProInviteLinks for daily fresh Canva Pro team invites! "
+                    "Get early access, exclusive drops, and never miss a link again!\n"
                     "👉 https://t.me/CanvaProInviteLinks"
                 )
                 keyboard = InlineKeyboardMarkup([
-                    [InlineKeyboardButton("📣 Share this Channel", switch_inline_query=share_text)]
+                    [InlineKeyboardButton("📣 Share this Channel", url="https://t.me/CanvaProInviteLinks")]
                 ])
                 await context.bot.send_message(chat_id=CHANNEL_ID, text="👇 <b>Share this channel with friends!</b>", parse_mode="HTML", reply_markup=keyboard)
                 last_posted_link = latest
