@@ -46,15 +46,22 @@ def log_important(event: str):
 
 # --- Command Handlers ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id == BOT_ADMIN_ID:
+    user = update.effective_user
+    message = update.message
+    if user and user.id == BOT_ADMIN_ID:
         logger.info("/start command received.")
-        log_important(f"/start by admin at {update.message.date}")
-        await update.message.reply_text("🎉 Bot started! Use /help to see commands.")
+        if message and hasattr(message, 'date'):
+            log_important(f"/start by admin at {message.date}")
+        if message and hasattr(message, 'reply_text'):
+            await message.reply_text("🎉 Bot started! Use /help to see commands.")
     else:
-        await update.message.reply_text("🚫 You’re not authorized.")
+        if message and hasattr(message, 'reply_text'):
+            await message.reply_text("🚫 You’re not authorized.")
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id == BOT_ADMIN_ID:
+    user = update.effective_user
+    message = update.message
+    if user and user.id == BOT_ADMIN_ID:
         txt = (
             "<b>Admin Commands:</b>\n"
             "/post - Scrape & post the latest link\n"
@@ -71,73 +78,117 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• 00:00–03:00 (12–3 AM)\n"
             "\nPosts are sent at random times within these slots each day."
         )
-        await update.message.reply_text(txt, parse_mode="HTML")
+        if message and hasattr(message, 'reply_text'):
+            await message.reply_text(txt, parse_mode="HTML")
     else:
-        await update.message.reply_text("🚫 Unauthorized.")
+        if message and hasattr(message, 'reply_text'):
+            await message.reply_text("🚫 Unauthorized.")
 
 async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global last_posted_link
-    if update.effective_user.id != BOT_ADMIN_ID:
-        return await update.message.reply_text("🚫 Unauthorized.")
-    try:
-        log_important(f"/post at {update.message.date}")
-        await asyncio.sleep(random.uniform(1, 2.5))
-        latest = await get_latest_canva_link(use_proxy=False)
-        if latest and latest != last_posted_link:
-            msg = (
-                f"✅ <b>New Canva Link:</b>\n{latest}\n\n"
-                "🔔 Unmute to access first! ⏩\n"
-                "⚡ <i>Powered by @CanvaProInviteLinks</i>"
-            )
-            await bot.send_message(chat_id=CHANNEL_ID, text=msg, parse_mode="HTML")
-            last_posted_link = latest
-            await update.message.reply_text("✅ Link posted.")
-            log_important(f"Posted link: {latest}")
-        elif latest == last_posted_link:
-            await update.message.reply_text("ℹ️ No new link.")
-            log_important("No new link found.")
-        else:
-            await update.message.reply_text("⚠️ Fetch failed.")
-            log_important("Fetch returned no valid link.")
-    except Exception as e:
-        logger.error(f"Error in /post: {e}")
-        await bot.send_message(chat_id=BOT_ADMIN_ID, text=f"Error in /post: {e}")
-        await update.message.reply_text("❌ Something went wrong; check your DM.")
-        log_important(f"ERROR in /post: {e}")
+    user = update.effective_user
+    message = update.message
+    if not (user and user.id == BOT_ADMIN_ID):
+        if message and hasattr(message, 'reply_text'):
+            return await message.reply_text("🚫 Unauthorized.")
+        return
+    try_count = 0
+    max_tries = 3
+    latest = None
+    error_msg = None
+    while try_count < max_tries:
+        try:
+            if message and hasattr(message, 'date'):
+                if try_count == 0:
+                    log_important(f"/post at {message.date}")
+            await asyncio.sleep(random.uniform(1, 2.5))
+            latest = await get_latest_canva_link(use_proxy=False)
+            if latest and latest != last_posted_link:
+                msg = (
+                    f"✅ <b>New Canva Link:</b>\n{latest}\n\n"
+                    "🔔 Unmute to access first! ⏩\n"
+                    "⚡ <i>Powered by @CanvaProInviteLinks</i>\n\n"
+                    "💬 <b>React to this message for a new working Canva link!</b>"
+                )
+                await context.bot.send_message(chat_id=CHANNEL_ID, text=msg, parse_mode="HTML")
+                last_posted_link = latest
+                if message and hasattr(message, 'reply_text'):
+                    await message.reply_text("✅ Link posted.")
+                log_important(f"Posted link: {latest}")
+                return
+            elif latest == last_posted_link:
+                if message and hasattr(message, 'reply_text'):
+                    await message.reply_text("ℹ️ No new link.")
+                log_important("No new link found.")
+                return
+            else:
+                error_msg = "Fetch returned no valid link."
+        except Exception as e:
+            error_msg = str(e)
+        try_count += 1
+    # If we reach here, all tries failed
+    if message and hasattr(message, 'reply_text'):
+        await message.reply_text("❌ Could not fetch a new Canva link after 3 tries. Check your DM for details.")
+    logger.error(f"Error in /post after {max_tries} tries: {error_msg}")
+    await context.bot.send_message(chat_id=BOT_ADMIN_ID, text=f"Error in /post after {max_tries} tries: {error_msg}")
+    log_important(f"ERROR in /post after {max_tries} tries: {error_msg}")
 
 async def lastlink(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != BOT_ADMIN_ID:
-        return await update.message.reply_text("🚫 Unauthorized.")
+    user = update.effective_user
+    message = update.message
+    if not (user and user.id == BOT_ADMIN_ID):
+        if message and hasattr(message, 'reply_text'):
+            return await message.reply_text("🚫 Unauthorized.")
+        return
     msg = last_posted_link or "No link posted yet."
-    await update.message.reply_text(f"🔗 Last posted: {msg}")
-    log_important(f"/lastlink at {update.message.date}")
+    if message and hasattr(message, 'reply_text'):
+        await message.reply_text(f"🔗 Last posted: {msg}")
+    if message and hasattr(message, 'date'):
+        log_important(f"/lastlink at {message.date}")
 
 async def logs(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != BOT_ADMIN_ID:
-        return await update.message.reply_text("🚫 Unauthorized.")
+    user = update.effective_user
+    message = update.message
+    if not (user and user.id == BOT_ADMIN_ID):
+        if message and hasattr(message, 'reply_text'):
+            return await message.reply_text("🚫 Unauthorized.")
+        return
     try:
         lines = open(IMPORTANT_LOG_PATH).read().splitlines()[-20:]
         text = "\n".join(lines)
-        await bot.send_message(chat_id=BOT_ADMIN_ID, text=f"<code>{text}</code>", parse_mode="HTML")
-        await update.message.reply_text("📬 Sent you the logs.")
+        await context.bot.send_message(chat_id=BOT_ADMIN_ID, text=f"<code>{text}</code>", parse_mode="HTML")
+        if message and hasattr(message, 'reply_text'):
+            await message.reply_text("📬 Sent you the logs.")
     except Exception as e:
         logger.error(f"Error reading logs: {e}")
-        await bot.send_message(chat_id=BOT_ADMIN_ID, text=f"Error reading logs: {e}")
-        await update.message.reply_text("⚠️ Could not fetch logs.")
+        await context.bot.send_message(chat_id=BOT_ADMIN_ID, text=f"Error reading logs: {e}")
+        if message and hasattr(message, 'reply_text'):
+            await message.reply_text("⚠️ Could not fetch logs.")
 
 async def health(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id == BOT_ADMIN_ID:
-        await update.message.reply_text("💚 I’m alive and kicking!")
-        log_important(f"/health at {update.message.date}")
+    user = update.effective_user
+    message = update.message
+    if user and user.id == BOT_ADMIN_ID:
+        if message and hasattr(message, 'reply_text'):
+            await message.reply_text("💚 I’m alive and kicking!")
+        if message and hasattr(message, 'date'):
+            log_important(f"/health at {message.date}")
     else:
-        await update.message.reply_text("🚫 Unauthorized.")
+        if message and hasattr(message, 'reply_text'):
+            await message.reply_text("🚫 Unauthorized.")
 
 async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != BOT_ADMIN_ID:
-        return await update.message.reply_text("🚫 Unauthorized.")
-    await update.message.reply_text("🔄 Restarting…")
-    await bot.send_message(chat_id=BOT_ADMIN_ID, text="🔄 Restart now.")
-    log_important(f"/restart at {update.message.date}")
+    user = update.effective_user
+    message = update.message
+    if not (user and user.id == BOT_ADMIN_ID):
+        if message and hasattr(message, 'reply_text'):
+            return await message.reply_text("🚫 Unauthorized.")
+        return
+    if message and hasattr(message, 'reply_text'):
+        await message.reply_text("🔄 Restarting…")
+    await context.bot.send_message(chat_id=BOT_ADMIN_ID, text="🔄 Restart now.")
+    if message and hasattr(message, 'date'):
+        log_important(f"/restart at {message.date}")
     os._exit(1)
 
 # --- Health & Root Endpoints ---
@@ -172,22 +223,34 @@ def schedule_posting():
 
 async def post_latest_link():
     global last_posted_link
-    try:
-        latest = await get_latest_canva_link(use_proxy=False)
-        if latest and latest != last_posted_link:
-            msg = (
-                f"✅ <b>New Canva Link:</b>\n{latest}\n\n"
-                "🔔 Unmute to access first! ⏩\n"
-                "⚡ <i>Powered by @CanvaProInviteLinks</i>"
-            )
-            await bot.send_message(chat_id=CHANNEL_ID, text=msg, parse_mode="HTML")
-            last_posted_link = latest
-            logger.info(f"Background posted: {latest}")
-        else:
-            logger.info("Background: no new link")
-    except Exception as e:
-        logger.error(f"Background error: {e}")
-        await bot.send_message(chat_id=BOT_ADMIN_ID, text=f"BG error: {e}")
+    try_count = 0
+    max_tries = 3
+    latest = None
+    error_msg = None
+    while try_count < max_tries:
+        try:
+            latest = await get_latest_canva_link(use_proxy=False)
+            if latest and latest != last_posted_link:
+                msg = (
+                    f"✅ <b>New Canva Link:</b>\n{latest}\n\n"
+                    "🔔 Unmute to access first! ⏩\n"
+                    "⚡ <i>Powered by @CanvaProInviteLinks</i>\n\n"
+                    "💬 <b>React to this message for a new working Canva link!</b>"
+                )
+                await Bot.send_message(self=bot, chat_id=CHANNEL_ID, text=msg, parse_mode="HTML")
+                last_posted_link = latest
+                logger.info(f"Background posted: {latest}")
+                return
+            elif latest == last_posted_link:
+                logger.info("Background: no new link")
+                return
+            else:
+                error_msg = "Fetch returned no valid link."
+        except Exception as e:
+            error_msg = str(e)
+        try_count += 1
+    logger.error(f"Background error after {max_tries} tries: {error_msg}")
+    await Bot.send_message(self=bot, chat_id=BOT_ADMIN_ID, text=f"BG error after {max_tries} tries: {error_msg}")
 
 async def run_scheduler():
     while True:
@@ -213,6 +276,6 @@ def main():
     app.run_polling()
 
 if __name__ == "__main__":
-    if platform.system() == "Windows":
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    if platform.system() == "Windows" and hasattr(asyncio, "WindowsSelectorEventLoopPolicy"):
+        asyncio.set_event_loop_policy(getattr(asyncio, "WindowsSelectorEventLoopPolicy")())
     main()
