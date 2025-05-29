@@ -114,7 +114,7 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
                 share_url = (
                     "https://t.me/share/url?url=https://t.me/CanvaProInviteLinks&text="
-                    "🚀 Join this channel for daily Canva Pro team links! 🔥 Don't miss out – it's 100% free and updated regularly!"
+                    "🚀 Unlock daily Canva Pro team links! 🔥 Totally free, always fresh. Join us now: https://t.me/CanvaProInviteLinks"
                 )
                 keyboard = InlineKeyboardMarkup([
                     [InlineKeyboardButton("📣 Share this Channel", url=share_url)]
