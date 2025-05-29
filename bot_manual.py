@@ -108,7 +108,7 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"✅ <b>New Canva Link:</b>\n{latest}\n\n"
                     "🔔 Unmute to access first! ⏩\n"
                     "⚡ <i>Powered by @CanvaProInviteLinks</i>\n"
-                    f"🎯 <b>Goal:</b> <i>Let's hit {random.randint(13, 22)} reactions! 🚀</i>\n\n"
+                    f"🎯 <b>Goal:</b> <i>Let's hit {random.randint(14, 22)} reactions! 🚀</i>\n\n"
                 )
                 # Add a share button as an inline button to the same post
                 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
