@@ -108,7 +108,7 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"✅ <b>New Canva Link:</b>\n{latest}\n\n"
                     "🔔 Unmute to access first! ⏩\n"
                     "⚡ <i>Powered by @CanvaProInviteLinks</i>\n"
-                    f"🎯 <b>Reaction Aim:</b> {random.randint(13,22)} reactions🚀</i>\n"
+                    f"🎯 <b>Goal:</b> Let's hit {random.randint(13, 22)} reactions! 🚀\n"
                 )
                 # Send the main message and get the message_id for the share button
                 sent_msg = await context.bot.send_message(chat_id=CHANNEL_ID, text=msg, parse_mode="HTML")
