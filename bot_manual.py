@@ -107,10 +107,22 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 msg = (
                     f"✅ <b>New Canva Link:</b>\n{latest}\n\n"
                     "🔔 Unmute to access first! ⏩\n"
-                    "⚡ <i>Powered by @CanvaProInviteLinks</i>\n\n"
-                    f"💬 <i>Give {random.randint(14,22)} reactions for fresh Canva invite link!🚀</i>"
+                    "⚡ <i>Powered by @CanvaProInviteLinks</i>\n"
+                    f"🎯 <b>Reaction Aim:</b> {random.randint(11,22)} reactions🚀</i>\n"
                 )
-                await context.bot.send_message(chat_id=CHANNEL_ID, text=msg, parse_mode="HTML")
+                # Send the main message and get the message_id for the share button
+                sent_msg = await context.bot.send_message(chat_id=CHANNEL_ID, text=msg, parse_mode="HTML")
+                # Add a share button below the post
+                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                share_text = (
+                    "🔥 Join @CanvaProInviteLinks for daily fresh Canva Pro team invites Lifetime FREE! "
+                    "Get early access, exclusive drops, and never miss a invite link again!\n"
+                    "👉 https://t.me/CanvaProInviteLinks"
+                )
+                keyboard = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("📣 Share this Channel", switch_inline_query=share_text)]
+                ])
+                await context.bot.send_message(chat_id=CHANNEL_ID, text="👇 <b>Share this channel with friends!</b>", parse_mode="HTML", reply_markup=keyboard)
                 last_posted_link = latest
                 if message and hasattr(message, 'reply_text'):
                     await message.reply_text("✅ Link posted.")
