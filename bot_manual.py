@@ -108,7 +108,7 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"✅ <b>New Canva Link:</b>\n{latest}\n\n"
                     "🔔 Unmute to access first! ⏩\n"
                     "⚡ <i>Powered by @CanvaProInviteLinks</i>\n"
-                    f"🎯 <b>Reaction Aim:</b> <i>Let's hit {random.randint(11,22)} reactions on this post like YouTubers do! 🚀</i>\n\n"
+                    f"🎯 <b>Goal:</b> <i>Let's hit {random.randint(13, 22)} reactions! 🚀</i>\n\n"
                 )
                 sent_msg = await context.bot.send_message(chat_id=CHANNEL_ID, text=msg, parse_mode="HTML")
                 # Add a share button as a regular URL button (not switch_inline_query) for channel compatibility
