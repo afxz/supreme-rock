@@ -108,7 +108,7 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"✅ <b>New Canva Link:</b>\n{latest}\n\n"
                     "🔔 Unmute to access first! ⏩\n"
                     "⚡ <i>Powered by @CanvaProInviteLinks</i>\n\n"
-                    f"💬 <i>Give <u>{random.randint(7,20)}</u> reactions to this post for a fresh Canva invite link!🚀</i>"
+                    f"💬 <i>Give {random.randint(14,22)} reactions for fresh Canva invite link!🚀</i>"
                 )
                 await context.bot.send_message(chat_id=CHANNEL_ID, text=msg, parse_mode="HTML")
                 last_posted_link = latest
