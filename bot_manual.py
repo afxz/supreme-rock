@@ -107,7 +107,7 @@ def format_canva_post_message(latest_link, for_manual=True, working_votes=None, 
     msg = (
         f"{good_emoji} <b>New Canva Pro Team Link:</b>\n"
         f"<a href='{latest_link}'>{latest_link}</a>\n\n"
-        "🔔 <i>Unmute for instant access!</i>\n\n"
+        "🔔 <i>Unmute for instant access!</i>\n"
         "🖼️ <b>Proof:</b> After joining, send a screenshot to <a href='https://t.me/aenzBot'>@aenzBot</a>."
     )
     if for_manual:
@@ -222,10 +222,10 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
             latest = await get_latest_canva_link(use_proxy=False)
             if latest and latest != last_posted_link:
                 # Initialize votes and emoji pair
-                working_votes = random.randint(6, 14)
+                working_votes = random.randint(3, 7)
                 not_working_votes = 0
                 emoji_pairs = [
-                    ("🟢", "🔴"), ("✅", "❌"), ("🔥", "💩"), ("💯", "😵"), ("😎", "😭"), ("🚀", "🛑"), ("🌟", "👎"), ("🥇", "🥀"), ("🍀", "🪦"), ("🎉", "😬")
+                    ("🟢", "🔴"), ("✅", "❌"), ("🔥", "😞"), ("💯", "😵"), ("😎", "😭"), ("🚀", "🛑"), ("🌟", "👎"), ("🥇", "🥀"), ("🍀", "🪦"), ("🎉", "😬")
                 ]
                 emoji_pair = secrets.choice(emoji_pairs)
                 msg, keyboard, _ = format_canva_post_message(latest, for_manual=True, working_votes=working_votes, not_working_votes=not_working_votes, emoji_pair=emoji_pair)
