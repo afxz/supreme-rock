@@ -95,28 +95,26 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackQueryHandler
 
 # --- Enhanced Message Formatting with Voting ---
-def format_canva_post_message(latest_link, for_manual=True, working_votes=None, not_working_votes=None, emoji_pair=None):
-    # Use a random emoji pair for voting if not provided
+def format_canva_post_message(latest_link, working_votes=None, not_working_votes=None, emoji_pair=None):
+    import secrets
     emoji_pairs = [
         ("🟢", "🔴"), ("✅", "❌"), ("🔥", "😞"), ("💯", "😵"), ("😎", "😭"), ("🚀", "🛑"), ("🌟", "👎"), ("🥇", "🥀"), ("🍀", "🪦"), ("🎉", "😬")
     ]
     if emoji_pair is None:
         emoji_pair = secrets.choice(emoji_pairs)
     good_emoji, bad_emoji = emoji_pair
-    # Compose message with more emojis for visual appeal
+    # 🎯 Goal line
+    goal_num = random.randint(4, 10)
     msg = (
         f"{good_emoji} <b>New Canva Pro Team Link:</b>\n"
         f"<a href='{latest_link}'>{latest_link}</a>\n\n"
         "🔔 <i>Unmute for instant access!</i>\n"
-        "🖼️ <b>Proof:</b> After joining, send a screenshot to <a href='https://t.me/aenzBot'>@aenzBot</a>."
+        "🖼️ <b>Proof:</b> After joining, send a screenshot to <a href='https://t.me/aenzBot'>@aenzBot</a>.\n\n"
+        f"🎯 <b>Goal:</b> Let's hit <b>{goal_num}</b> reactions! 🚀\n"
+        "<code>React below to help others know if it works!</code>"
     )
-    if for_manual:
-        msg += f"\n\n<code>React below to help others know if it works!</code>"
-    else:
-        msg += f"\n\n<code>React below to help others know if it works!</code>"
-    # Voting buttons
     if working_votes is None:
-        working_votes = random.randint(4, 7)
+        working_votes = 0  # Start at 0, will be bumped after delay
     if not_working_votes is None:
         not_working_votes = 0
     keyboard = InlineKeyboardMarkup([
@@ -126,7 +124,7 @@ def format_canva_post_message(latest_link, for_manual=True, working_votes=None, 
         ],
         [
             InlineKeyboardButton("📣 Share Channel", url="https://t.me/share/url?url=https://t.me/CanvaProInviteLinks&text=Unlock daily Canva Pro team links! Totally free, always fresh."),
-            InlineKeyboardButton("✅ Backup Channel", url="https://t.me/+ejp2_sjBtJczY2I9")
+            InlineKeyboardButton("🖼️ Send Proof", url="https://t.me/aenzBot")
         ]
     ])
     return msg, keyboard, emoji_pair
@@ -150,7 +148,7 @@ async def vote_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     emoji_pair = (good_emoji, bad_emoji)
     # Initialize vote data if not present
     if msg_id not in vote_data:
-        vote_data[msg_id] = {'working': random.randint(6, 14), 'not_working': 0, 'voters': set(), 'emoji_pair': emoji_pair}
+        vote_data[msg_id] = {'working': 0, 'not_working': 0, 'voters': set(), 'emoji_pair': emoji_pair}
     votes = vote_data[msg_id]
     if 'emoji_pair' not in votes:
         votes['emoji_pair'] = emoji_pair
@@ -179,7 +177,6 @@ async def vote_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 canva_link = line.strip()
                 break
             if '<a href=' in line and 'canva.com' in line:
-                # Extract from HTML link
                 import re
                 m = re.search(r"<a href='([^']+canva.com[^']*)'", line)
                 if m:
@@ -187,10 +184,8 @@ async def vote_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     break
         if not canva_link and len(lines) > 1:
             canva_link = lines[1].strip()
-    # Update buttons with new counts and same emoji pair
     formatted_msg, keyboard, _ = format_canva_post_message(
         latest_link=canva_link or "[link hidden]",
-        for_manual=False,
         working_votes=votes['working'],
         not_working_votes=votes['not_working'],
         emoji_pair=votes['emoji_pair']
@@ -221,20 +216,30 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await asyncio.sleep(random.uniform(1, 2.5))
             latest = await get_latest_canva_link(use_proxy=False)
             if latest and latest != last_posted_link:
-                # Initialize votes and emoji pair
-                working_votes = random.randint(3, 7)
+                working_votes = 0
                 not_working_votes = 0
                 emoji_pairs = [
                     ("🟢", "🔴"), ("✅", "❌"), ("🔥", "😞"), ("💯", "😵"), ("😎", "😭"), ("🚀", "🛑"), ("🌟", "👎"), ("🥇", "🥀"), ("🍀", "🪦"), ("🎉", "😬")
                 ]
                 emoji_pair = secrets.choice(emoji_pairs)
-                msg, keyboard, _ = format_canva_post_message(latest, for_manual=True, working_votes=working_votes, not_working_votes=not_working_votes, emoji_pair=emoji_pair)
+                msg, keyboard, _ = format_canva_post_message(latest, working_votes=working_votes, not_working_votes=not_working_votes, emoji_pair=emoji_pair)
                 sent_msg = await context.bot.send_message(chat_id=CHANNEL_ID, text=msg, parse_mode="HTML", reply_markup=keyboard)
                 vote_data[sent_msg.message_id] = {'working': working_votes, 'not_working': not_working_votes, 'voters': set(), 'emoji_pair': emoji_pair}
                 last_posted_link = latest
                 if message and hasattr(message, 'reply_text'):
                     await message.reply_text("✅ Link posted.")
                 log_important(f"Posted link: {latest}")
+                # --- Delayed bump of working votes ---
+                async def delayed_bump(msg_id, link, emoji_pair):
+                    await asyncio.sleep(10)
+                    bump_votes = random.randint(4, 6)
+                    vote_data[msg_id]['working'] = bump_votes
+                    msg, keyboard, _ = format_canva_post_message(link, working_votes=bump_votes, not_working_votes=0, emoji_pair=emoji_pair)
+                    try:
+                        await context.bot.edit_message_reply_markup(chat_id=CHANNEL_ID, message_id=msg_id, reply_markup=keyboard)
+                    except Exception:
+                        pass
+                asyncio.create_task(delayed_bump(sent_msg.message_id, latest, emoji_pair))
                 return
             elif latest == last_posted_link:
                 if message and hasattr(message, 'reply_text'):
@@ -246,7 +251,6 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             error_msg = str(e)
         try_count += 1
-    # If we reach here, all tries failed
     if message and hasattr(message, 'reply_text'):
         await message.reply_text("❌ Could not fetch a new Canva link after 3 tries. Check your DM for details.")
     logger.error(f"Error in /post after {max_tries} tries: {error_msg}")
