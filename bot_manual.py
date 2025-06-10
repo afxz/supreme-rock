@@ -205,18 +205,22 @@ def format_canva_post_message(latest_link, for_manual=True):
         f"✅ <b>New Canva Link:</b>\n{latest_link}\n\n"
         "🔔 Unmute to access first! ⏩\n"
         "⚡ <i>Powered by @CanvaProInviteLinks</i>\n"
+        "<b>Backup:</b> <a href='https://t.me/+ejp2_sjBtJczY2I9'>Join our backup channel</a> in case of bans.\n"
+        "<b>Proof:</b> After joining, send a screenshot to <a href='https://t.me/aenzBot'>@aenzBot</a>.\n"
     )
     if for_manual:
         msg += f"🎯 <b>Goal:</b> <i>Let's hit {random.randint(6, 12)} reactions! 🚀</i>\n\n"
     else:
-        msg += f"💬 <b>Give <u>{random.randint(5,10)}</u> reactions to this message for a fresh Canva invite link!\nThe more reactions, the faster the next link drops! 🚀</b>"
+        msg += f"💬 <b>Give <u>{random.randint(5,10)}</u> reactions for a fresh Canva invite link! The more reactions, the faster the next link drops! 🚀</b>"
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-    share_url = (
-        "https://t.me/share/url?url=https://t.me/CanvaProInviteLinks&text="
-        "🚀 Unlock daily Canva Pro team links! 🔥 Totally free, always fresh."
-    )
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📣 Share this Channel", url=share_url)]
+        [
+            InlineKeyboardButton("📣 Share Channel", url="https://t.me/share/url?url=https://t.me/CanvaProInviteLinks&text=🚀 Unlock daily Canva Pro team links! 🔥 Totally free, always fresh."),
+            InlineKeyboardButton("🔗 Backup Channel", url="https://t.me/+ejp2_sjBtJczY2I9")
+        ],
+        [
+            InlineKeyboardButton("🖼️ Send Proof", url="https://t.me/aenzBot")
+        ]
     ])
     return msg, keyboard
 
