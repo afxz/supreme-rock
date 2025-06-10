@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 import pytz
 from aiohttp import web
 from telegram import Bot, Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
 
 from scrape_links import get_latest_canva_link
 from config import BOT_TOKEN, CHANNEL_ID, BOT_ADMIN_ID, IMPORTANT_LOG_PATH
@@ -83,6 +83,100 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if message and hasattr(message, 'reply_text'):
             await message.reply_text("🚫 Unauthorized.")
 
+# --- Voting Data ---
+vote_data = {}  # message_id: {'working': int, 'not_working': int, 'voters': set}
+
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import CallbackQueryHandler
+
+# --- Enhanced Message Formatting with Voting ---
+def format_canva_post_message(latest_link, for_manual=True, working_votes=None, not_working_votes=None):
+    msg = (
+        f"✅ <b>New Canva Link:</b>\n{latest_link}\n\n"
+        "🔔 Unmute to access first! ⏩\n"
+        "⚡ <i>Powered by @CanvaProInviteLinks</i>\n"
+        "<b>Backup:</b> <a href='https://t.me/+ejp2_sjBtJczY2I9'>Join our backup channel</a> in case of bans.\n"
+        "<b>Proof:</b> After joining, send a screenshot to <a href='https://t.me/aenzBot'>@aenzBot</a>.\n"
+    )
+    if for_manual:
+        msg += f"🎯 <b>Goal:</b> <i>Let's hit {random.randint(6, 12)} reactions! 🚀</i>\n\n"
+    else:
+        msg += f"💬 <b>Give <u>{random.randint(5,10)}</u> reactions for a fresh Canva invite link! The more reactions, the faster the next link drops! 🚀</b>"
+    # Voting buttons
+    if working_votes is None:
+        working_votes = random.randint(6, 14)
+    if not_working_votes is None:
+        not_working_votes = 0
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(f"👍 Working ({working_votes})", callback_data="vote_working"),
+            InlineKeyboardButton(f"👎 Not Working ({not_working_votes})", callback_data="vote_not_working")
+        ],
+        [
+            InlineKeyboardButton("📣 Share Channel", url="https://t.me/share/url?url=https://t.me/CanvaProInviteLinks&text=🚀 Unlock daily Canva Pro team links! 🔥 Totally free, always fresh."),
+            InlineKeyboardButton("🔗 Backup Channel", url="https://t.me/+ejp2_sjBtJczY2I9")
+        ],
+        [
+            InlineKeyboardButton("🖼️ Send Proof", url="https://t.me/aenzBot")
+        ]
+    ])
+    return msg, keyboard
+
+# --- Voting Callback Handler ---
+async def vote_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = getattr(update, 'callback_query', None)
+    if not query or not hasattr(query, 'message') or not hasattr(query, 'from_user'):
+        return
+    user_id = getattr(query.from_user, 'id', None)
+    msg = getattr(query, 'message', None)
+    msg_id = getattr(msg, 'message_id', None)
+    data = getattr(query, 'data', None)
+    if msg_id is None or user_id is None or data is None:
+        return
+    # Initialize vote data if not present
+    if msg_id not in vote_data:
+        vote_data[msg_id] = {'working': random.randint(6, 14), 'not_working': 0, 'voters': set()}
+    votes = vote_data[msg_id]
+    if user_id in votes['voters']:
+        await query.answer("You already voted on this link!", show_alert=True)
+        return
+    if data == "vote_working":
+        votes['working'] += 1
+        votes['voters'].add(user_id)
+        await query.answer("Thanks for your feedback!", show_alert=False)
+    elif data == "vote_not_working":
+        votes['not_working'] += 1
+        votes['voters'].add(user_id)
+        await query.answer("We'll post a new link soon!", show_alert=True)
+        # Optionally, reply to user in chat
+        try:
+            await context.bot.send_message(chat_id=user_id, text="Thanks for reporting! Please wait for a new Canva link to be posted soon.")
+        except Exception:
+            pass
+    # Extract the Canva link from the message text robustly
+    canva_link = None
+    msg_text = getattr(msg, 'text', None)
+    if msg_text:
+        lines = msg_text.split('\n')
+        for line in lines:
+            if line.startswith('https://www.canva.com/'):
+                canva_link = line.strip()
+                break
+        if not canva_link and len(lines) > 1:
+            canva_link = lines[1].strip()
+    # Update buttons with new counts
+    formatted_msg, keyboard = format_canva_post_message(
+        latest_link=canva_link or "[link hidden]",
+        for_manual=False,
+        working_votes=votes['working'],
+        not_working_votes=votes['not_working']
+    )
+    try:
+        await query.edit_message_reply_markup(reply_markup=keyboard)
+    except Exception:
+        pass
+
+# --- Patch posting logic to include voting ---
 async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global last_posted_link
     user = update.effective_user
@@ -103,8 +197,12 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await asyncio.sleep(random.uniform(1, 2.5))
             latest = await get_latest_canva_link(use_proxy=False)
             if latest and latest != last_posted_link:
-                msg, keyboard = format_canva_post_message(latest, for_manual=True)
+                # Initialize votes
+                working_votes = random.randint(6, 14)
+                not_working_votes = 0
+                msg, keyboard = format_canva_post_message(latest, for_manual=True, working_votes=working_votes, not_working_votes=not_working_votes)
                 sent_msg = await context.bot.send_message(chat_id=CHANNEL_ID, text=msg, parse_mode="HTML", reply_markup=keyboard)
+                vote_data[sent_msg.message_id] = {'working': working_votes, 'not_working': not_working_votes, 'voters': set()}
                 last_posted_link = latest
                 if message and hasattr(message, 'reply_text'):
                     await message.reply_text("✅ Link posted.")
@@ -198,31 +296,6 @@ async def start_health_server():
     site = web.TCPSite(runner, "0.0.0.0", 8080)
     await site.start()
     logger.info("Health server running on :8080")
-
-# --- Message Formatting ---
-def format_canva_post_message(latest_link, for_manual=True):
-    msg = (
-        f"✅ <b>New Canva Link:</b>\n{latest_link}\n\n"
-        "🔔 Unmute to access first! ⏩\n"
-        "⚡ <i>Powered by @CanvaProInviteLinks</i>\n"
-        "<b>Backup:</b> <a href='https://t.me/+ejp2_sjBtJczY2I9'>Join our backup channel</a> in case of bans.\n"
-        "<b>Proof:</b> After joining, send a screenshot to <a href='https://t.me/aenzBot'>@aenzBot</a>.\n"
-    )
-    if for_manual:
-        msg += f"🎯 <b>Goal:</b> <i>Let's hit {random.randint(6, 12)} reactions! 🚀</i>\n\n"
-    else:
-        msg += f"💬 <b>Give <u>{random.randint(5,10)}</u> reactions for a fresh Canva invite link! The more reactions, the faster the next link drops! 🚀</b>"
-    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-    keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("📣 Share Channel", url="https://t.me/share/url?url=https://t.me/CanvaProInviteLinks&text=🚀 Unlock daily Canva Pro team links! 🔥 Totally free, always fresh."),
-            InlineKeyboardButton("🔗 Backup Channel", url="https://t.me/+ejp2_sjBtJczY2I9")
-        ],
-        [
-            InlineKeyboardButton("🖼️ Send Proof", url="https://t.me/aenzBot")
-        ]
-    ])
-    return msg, keyboard
 
 # --- Proxy Pool Management ---
 import time
@@ -321,7 +394,7 @@ def main():
                     ("logs", logs), ("health", health),
                     ("restart", restart)]:
         app.add_handler(CommandHandler(cmd, fn))
-
+    app.add_handler(CallbackQueryHandler(vote_callback, pattern=r"^vote_"))
     # Kick off background services on the running loop
     loop = asyncio.get_event_loop()
     loop.create_task(start_health_server())
