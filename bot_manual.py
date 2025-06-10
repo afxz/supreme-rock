@@ -123,7 +123,7 @@ def format_canva_post_message(latest_link, working_votes=None, not_working_votes
             InlineKeyboardButton(f"{bad_emoji} Not Working ({not_working_votes})", callback_data=f"vote_not_working|{good_emoji}|{bad_emoji}")
         ],
         [
-            InlineKeyboardButton("📣 Share Channel", url="https://t.me/share/url?url=https://t.me/CanvaProInviteLinks&text=Unlock daily Canva Pro team links! Totally free, always fresh."),
+            InlineKeyboardButton("📣 Share Channel", url="https://t.me/share/url?url=https://t.me/CanvaProInviteLinks&text=✅ Unlock daily Canva Pro team links! Totally free, always fresh. ❤️"),
             InlineKeyboardButton("Join Backup ⚠️", url="https://t.me/+ejp2_sjBtJczY2I9")
         ]
     ])
