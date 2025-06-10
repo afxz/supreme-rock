@@ -8,12 +8,11 @@ import asyncio
 from datetime import datetime, timedelta
 
 import pytz
-import schedule
 from aiohttp import web
 from telegram import Bot, Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-from scrape_links import get_latest_canva_link
+from scrape_links import get_latest_canva_link, get_latest_canva_link_with_proxy_pool
 from config import BOT_TOKEN, CHANNEL_ID, BOT_ADMIN_ID, IMPORTANT_LOG_PATH
 
 # --- Logging Setup ---
@@ -70,13 +69,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "/health - Check bot health\n"
             "/restart - Restart bot\n"
             "/help - This menu\n\n"
-            "<b>Auto-Posting Schedule (IST):</b>\n"
-            "• 04:00–06:00 (4–6 AM)\n"
-            "• 09:00–11:00 (9–11 AM)\n"
-            "• 13:00–15:00 (1–3 PM)\n"
-            "• 18:00–21:00 (6–9 PM)\n"
-            "• 00:00–03:00 (12–3 AM)\n"
-            "\nPosts are sent at random times within these slots each day."
+            "<b>Auto-Posting Info:</b>\n"
+            "• The bot automatically checks for new Canva links every 5–10 minutes (randomized).\n"
+            "• A new link is posted to the channel as soon as it is detected.\n"
+            "• Scraping uses a smart proxy pool to avoid bans and maximize reliability."
         )
         if message and hasattr(message, 'reply_text'):
             await message.reply_text(txt, parse_mode="HTML")
@@ -200,53 +196,6 @@ async def start_health_server():
     await site.start()
     logger.info("Health server running on :8080")
 
-# --- Scheduling ---
-IST = pytz.timezone("Asia/Kolkata")
-
-def random_time(start_h, end_h):
-    base = datetime.now(IST).replace(hour=0, minute=0, second=0, microsecond=0)
-    start = base + timedelta(hours=start_h)
-    end = base + timedelta(hours=end_h)
-    return start + timedelta(seconds=random.randint(0, int((end-start).total_seconds())))
-
-def schedule_posting():
-    slots = [(4,6),(9,11),(13,15),(18,21),(0,3)]
-    for s,e in slots:
-        t = random_time(s,e).strftime("%H:%M")
-        schedule.every().day.at(t).do(lambda: asyncio.create_task(post_latest_link()))
-    logger.info("Posting slots scheduled")
-
-async def post_latest_link():
-    global last_posted_link
-    try_count = 0
-    max_tries = 3
-    latest = None
-    error_msg = None
-    while try_count < max_tries:
-        try:
-            latest = await get_latest_canva_link(use_proxy=False)
-            if latest and latest != last_posted_link:
-                msg, keyboard = format_canva_post_message(latest, for_manual=False)
-                await Bot.send_message(self=bot, chat_id=CHANNEL_ID, text=msg, parse_mode="HTML", reply_markup=keyboard)
-                last_posted_link = latest
-                logger.info(f"Background posted: {latest}")
-                return
-            elif latest == last_posted_link:
-                logger.info("Background: no new link")
-                return
-            else:
-                error_msg = "Fetch returned no valid link."
-        except Exception as e:
-            error_msg = str(e)
-        try_count += 1
-    logger.error(f"Background error after {max_tries} tries: {error_msg}")
-    await Bot.send_message(self=bot, chat_id=BOT_ADMIN_ID, text=f"BG error after {max_tries} tries: {error_msg}")
-
-async def run_scheduler():
-    while True:
-        schedule.run_pending()
-        await asyncio.sleep(1)
-
 # --- Message Formatting ---
 def format_canva_post_message(latest_link, for_manual=True):
     msg = (
@@ -255,13 +204,13 @@ def format_canva_post_message(latest_link, for_manual=True):
         "⚡ <i>Powered by @CanvaProInviteLinks</i>\n"
     )
     if for_manual:
-        msg += f"🎯 <b>Goal:</b> <i>Let's hit {random.randint(14, 22)} reactions! 🚀</i>\n\n"
+        msg += f"🎯 <b>Goal:</b> <i>Let's hit {random.randint(6, 12)} reactions! 🚀</i>\n\n"
     else:
         msg += f"💬 <b>Give <u>{random.randint(5,10)}</u> reactions to this message for a fresh Canva invite link!\nThe more reactions, the faster the next link drops! 🚀</b>"
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     share_url = (
         "https://t.me/share/url?url=https://t.me/CanvaProInviteLinks&text="
-        "🚀 Unlock daily Canva Pro team links! 🔥 Totally free, always fresh. Join us now: https://t.me/CanvaProInviteLinks"
+        "🚀 Unlock daily Canva Pro team links! 🔥 Totally free, always fresh."
     )
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("📣 Share this Channel", url=share_url)]
@@ -309,6 +258,44 @@ class ProxyPool:
 
 proxy_pool = ProxyPool()
 
+async def get_latest_canva_link_with_proxy_pool(retries=3, use_proxy=True):
+    from scrape_links import fetch_free_proxies, get_stealth_headers
+    main_url = "https://bingotingo.com/best-social-media-platforms/"
+    import ssl
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    connector = aiohttp.TCPConnector(limit=5, ssl=ctx)
+    await proxy_pool.refresh(fetch_free_proxies)
+    for attempt in range(retries):
+        proxy = proxy_pool.get_proxy() if use_proxy else None
+        try:
+            async with aiohttp.ClientSession(connector=connector) as session:
+                headers = get_stealth_headers()
+                resp1 = await session.get(main_url, headers=headers, proxy=proxy)
+                resp1.raise_for_status()
+                soup1 = BeautifulSoup(await resp1.text(), 'html.parser')
+                download_btn = soup1.select_one('a.su-button')
+                if not download_btn:
+                    raise Exception("Download button not found on main page")
+                latest_link = download_btn['href']
+                await asyncio.sleep(random.uniform(1.0, 2.5))
+                headers = get_stealth_headers()
+                resp2 = await session.get(latest_link, headers=headers, proxy=proxy)
+                resp2.raise_for_status()
+                soup2 = BeautifulSoup(await resp2.text(), 'html.parser')
+                canva_btn = soup2.find('a', href=lambda h: h and h.startswith('https://www.canva.com/brand/'))
+                if not canva_btn:
+                    raise Exception("Canva link not found on redirected page")
+                proxy_pool.report(proxy, True)
+                return canva_btn['href']
+        except Exception as e:
+            proxy_pool.report(proxy, False)
+            if attempt == retries - 1:
+                raise
+            await asyncio.sleep(random.uniform(2, 5))
+    raise Exception("All proxies failed or no link found.")
+
 def main():
     # Build & register handlers
     app = ApplicationBuilder().token(BOT_TOKEN).build()
@@ -321,9 +308,6 @@ def main():
     # Kick off background services on the running loop
     loop = asyncio.get_event_loop()
     loop.create_task(start_health_server())
-    schedule_posting()
-    loop.create_task(run_scheduler())
-
     logger.info("Starting polling…")
     app.run_polling()
 
