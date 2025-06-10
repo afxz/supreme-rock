@@ -126,7 +126,7 @@ def format_canva_post_message(latest_link, for_manual=True, working_votes=None, 
         ],
         [
             InlineKeyboardButton("📣 Share Channel", url="https://t.me/share/url?url=https://t.me/CanvaProInviteLinks&text=Unlock daily Canva Pro team links! Totally free, always fresh."),
-            InlineKeyboardButton("🖼️ Send Proof", url="https://t.me/aenzBot")
+            InlineKeyboardButton("✅ Backup Channel", url="https://t.me/+ejp2_sjBtJczY2I9")
         ]
     ])
     return msg, keyboard, emoji_pair
