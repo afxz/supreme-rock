@@ -104,21 +104,7 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await asyncio.sleep(random.uniform(1, 2.5))
             latest = await get_latest_canva_link(use_proxy=False)
             if latest and latest != last_posted_link:
-                msg = (
-                    f"✅ <b>New Canva Link:</b>\n{latest}\n\n"
-                    "🔔 Unmute to access first! ⏩\n"
-                    "⚡ <i>Powered by @CanvaProInviteLinks</i>\n"
-                    f"🎯 <b>Goal:</b> <i>Let's hit {random.randint(14, 22)} reactions! 🚀</i>\n\n"
-                )
-                # Add a share button as an inline button to the same post
-                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-                share_url = (
-                    "https://t.me/share/url?url=https://t.me/CanvaProInviteLinks&text="
-                    "🚀 Unlock daily Canva Pro team links! 🔥 Totally free, always fresh. Join us now: https://t.me/CanvaProInviteLinks"
-                )
-                keyboard = InlineKeyboardMarkup([
-                    [InlineKeyboardButton("📣 Share this Channel", url=share_url)]
-                ])
+                msg, keyboard = format_canva_post_message(latest, for_manual=True)
                 sent_msg = await context.bot.send_message(chat_id=CHANNEL_ID, text=msg, parse_mode="HTML", reply_markup=keyboard)
                 last_posted_link = latest
                 if message and hasattr(message, 'reply_text'):
@@ -240,13 +226,8 @@ async def post_latest_link():
         try:
             latest = await get_latest_canva_link(use_proxy=False)
             if latest and latest != last_posted_link:
-                msg = (
-                    f"✅ <b>New Canva Link:</b>\n{latest}\n\n"
-                    "🔔 Unmute to access first! ⏩\n"
-                    "⚡ <i>Powered by @CanvaProInviteLinks</i>\n\n"
-                    f"💬 <b>Give <u>{random.randint(5,10)}</u> reactions to this message for a fresh Canva invite link!\nThe more reactions, the faster the next link drops! 🚀</b>"
-                )
-                await Bot.send_message(self=bot, chat_id=CHANNEL_ID, text=msg, parse_mode="HTML")
+                msg, keyboard = format_canva_post_message(latest, for_manual=False)
+                await Bot.send_message(self=bot, chat_id=CHANNEL_ID, text=msg, parse_mode="HTML", reply_markup=keyboard)
                 last_posted_link = latest
                 logger.info(f"Background posted: {latest}")
                 return
@@ -265,6 +246,68 @@ async def run_scheduler():
     while True:
         schedule.run_pending()
         await asyncio.sleep(1)
+
+# --- Message Formatting ---
+def format_canva_post_message(latest_link, for_manual=True):
+    msg = (
+        f"✅ <b>New Canva Link:</b>\n{latest_link}\n\n"
+        "🔔 Unmute to access first! ⏩\n"
+        "⚡ <i>Powered by @CanvaProInviteLinks</i>\n"
+    )
+    if for_manual:
+        msg += f"🎯 <b>Goal:</b> <i>Let's hit {random.randint(14, 22)} reactions! 🚀</i>\n\n"
+    else:
+        msg += f"💬 <b>Give <u>{random.randint(5,10)}</u> reactions to this message for a fresh Canva invite link!\nThe more reactions, the faster the next link drops! 🚀</b>"
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    share_url = (
+        "https://t.me/share/url?url=https://t.me/CanvaProInviteLinks&text="
+        "🚀 Unlock daily Canva Pro team links! 🔥 Totally free, always fresh. Join us now: https://t.me/CanvaProInviteLinks"
+    )
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📣 Share this Channel", url=share_url)]
+    ])
+    return msg, keyboard
+
+# --- Proxy Pool Management ---
+import time
+from collections import defaultdict
+
+class ProxyPool:
+    def __init__(self):
+        self.stats = defaultdict(lambda: {'success': 0, 'fail': 0, 'last_fail': 0.0})
+        self.cooldown = 600  # seconds to avoid a failed proxy
+        self.bad_proxies = set()
+        self.last_refresh = 0.0
+        self.proxies = []
+
+    async def refresh(self, fetch_func):
+        # Only refresh every 10 minutes
+        now = time.time()
+        if now - self.last_refresh < 600 and self.proxies:
+            return
+        self.proxies = await fetch_func()
+        self.last_refresh = now
+
+    def get_proxy(self):
+        # Return best proxy not in cooldown
+        now = time.time()
+        candidates = [p for p in self.proxies if now - self.stats[p]['last_fail'] > self.cooldown]
+        if not candidates:
+            return None
+        # Sort by (fail, -success)
+        candidates.sort(key=lambda p: (self.stats[p]['fail'], -self.stats[p]['success']))
+        return candidates[0]
+
+    def report(self, proxy, success):
+        if not proxy:
+            return
+        if success:
+            self.stats[proxy]['success'] += 1
+        else:
+            self.stats[proxy]['fail'] += 1
+            self.stats[proxy]['last_fail'] = float(time.time())
+
+proxy_pool = ProxyPool()
 
 def main():
     # Build & register handlers
