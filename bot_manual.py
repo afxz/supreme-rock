@@ -12,8 +12,11 @@ from aiohttp import web
 from telegram import Bot, Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-from scrape_links import get_latest_canva_link, get_latest_canva_link_with_proxy_pool
+from scrape_links import get_latest_canva_link
 from config import BOT_TOKEN, CHANNEL_ID, BOT_ADMIN_ID, IMPORTANT_LOG_PATH
+
+import aiohttp
+from bs4 import BeautifulSoup
 
 # --- Logging Setup ---
 logging.basicConfig(
@@ -260,6 +263,7 @@ proxy_pool = ProxyPool()
 
 async def get_latest_canva_link_with_proxy_pool(retries=3, use_proxy=True):
     from scrape_links import fetch_free_proxies, get_stealth_headers
+    import bs4
     main_url = "https://bingotingo.com/best-social-media-platforms/"
     import ssl
     ctx = ssl.create_default_context()
@@ -278,17 +282,26 @@ async def get_latest_canva_link_with_proxy_pool(retries=3, use_proxy=True):
                 download_btn = soup1.select_one('a.su-button')
                 if not download_btn:
                     raise Exception("Download button not found on main page")
-                latest_link = download_btn['href']
+                latest_link = download_btn.get('href') if hasattr(download_btn, 'get') else None
+                if not isinstance(latest_link, str):
+                    raise Exception("Download button href is not a string")
                 await asyncio.sleep(random.uniform(1.0, 2.5))
                 headers = get_stealth_headers()
                 resp2 = await session.get(latest_link, headers=headers, proxy=proxy)
                 resp2.raise_for_status()
                 soup2 = BeautifulSoup(await resp2.text(), 'html.parser')
-                canva_btn = soup2.find('a', href=lambda h: h and h.startswith('https://www.canva.com/brand/'))
-                if not canva_btn:
+                canva_link = None
+                for a in soup2.find_all('a'):
+                    if isinstance(a, bs4.element.Tag):
+                        if 'href' in a.attrs:
+                            href = a.attrs['href']
+                            if isinstance(href, str) and href.startswith('https://www.canva.com/brand/'):
+                                canva_link = href
+                                break
+                if not canva_link:
                     raise Exception("Canva link not found on redirected page")
                 proxy_pool.report(proxy, True)
-                return canva_btn['href']
+                return canva_link
         except Exception as e:
             proxy_pool.report(proxy, False)
             if attempt == retries - 1:

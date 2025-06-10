@@ -127,11 +127,9 @@ async def get_latest_canva_link_with_proxy_pool(proxy_pool, retries=3, use_proxy
                 for a in soup2.find_all('a'):
                     href = None
                     # Only process if a is a Tag (not NavigableString/PageElement)
-                    if type(a).__name__ == 'Tag':
-                        try:
-                            href = a['href']
-                        except Exception:
-                            continue
+                    if isinstance(a, bs4.element.Tag):
+                        if 'href' in a.attrs:
+                            href = a.attrs['href']
                     if isinstance(href, str) and href.startswith('https://www.canva.com/brand/'):
                         canva_link = href
                         break
