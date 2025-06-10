@@ -109,7 +109,7 @@ def format_canva_post_message(latest_link, working_votes=None, not_working_votes
         f"{good_emoji} <b>New Canva Pro Team Link:</b>\n"
         f"<a href='{latest_link}'>{latest_link}</a>\n\n"
         "🔔 <i>Unmute for instant access!</i>\n"
-        "🖼️ <b>Proof:</b> After joining, send a screenshot to <a href='https://t.me/aenzBot'>@aenzBot</a>.\n\n"
+        "🖼️ <b>Proof:</b> After joining, send a screenshot to <a href='https://t.me/aenzBot'>@aenzBot</a>.\n"
         f"🎯 <b>Goal:</b> Let's hit <b>{goal_num}</b> reactions! 🚀\n"
         "<code>React below to help others know if it works!</code>"
     )
