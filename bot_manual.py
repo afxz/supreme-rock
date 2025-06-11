@@ -130,6 +130,7 @@ def format_canva_post_message(latest_link, working_votes=None, not_working_votes
     return msg, keyboard, emoji_pair
 
 # --- Voting Callback Handler ---
+import telegram
 async def vote_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = getattr(update, 'callback_query', None)
     if not query or not hasattr(query, 'message') or not hasattr(query, 'from_user'):
@@ -153,16 +154,34 @@ async def vote_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if 'emoji_pair' not in votes:
         votes['emoji_pair'] = emoji_pair
     if user_id in votes['voters']:
-        await query.answer("You already voted on this link!", show_alert=True)
+        try:
+            await query.answer("You already voted on this link!", show_alert=True)
+        except telegram.error.BadRequest as e:
+            if "query is too old" in str(e).lower() or "query id is invalid" in str(e).lower():
+                logger.warning(f"[vote_callback] Ignored old/invalid query: {e}")
+            else:
+                logger.error(f"[vote_callback] Unexpected error: {e}")
         return
     if action == "vote_working":
         votes['working'] += 1
         votes['voters'].add(user_id)
-        await query.answer("Thanks for your feedback!", show_alert=False)
+        try:
+            await query.answer("Thanks for your feedback!", show_alert=False)
+        except telegram.error.BadRequest as e:
+            if "query is too old" in str(e).lower() or "query id is invalid" in str(e).lower():
+                logger.warning(f"[vote_callback] Ignored old/invalid query: {e}")
+            else:
+                logger.error(f"[vote_callback] Unexpected error: {e}")
     elif action == "vote_not_working":
         votes['not_working'] += 1
         votes['voters'].add(user_id)
-        await query.answer("We'll post a new link soon!", show_alert=True)
+        try:
+            await query.answer("We'll post a new link soon!", show_alert=True)
+        except telegram.error.BadRequest as e:
+            if "query is too old" in str(e).lower() or "query id is invalid" in str(e).lower():
+                logger.warning(f"[vote_callback] Ignored old/invalid query: {e}")
+            else:
+                logger.error(f"[vote_callback] Unexpected error: {e}")
         try:
             await context.bot.send_message(chat_id=user_id, text="Thanks for reporting! Please wait for a new Canva link to be posted soon.")
         except Exception:
@@ -418,18 +437,53 @@ async def get_latest_canva_link_with_proxy_pool(retries=3, use_proxy=True):
             await asyncio.sleep(random.uniform(2, 5))
     raise Exception("All proxies failed or no link found.")
 
+# --- Auto-posting background task ---
+async def auto_posting_task(context):
+    global last_posted_link
+    while True:
+        try:
+            await asyncio.sleep(random.randint(300, 600))  # 5–10 min
+            latest = await get_latest_canva_link(use_proxy=False)
+            if latest and latest != last_posted_link:
+                working_votes = 0
+                not_working_votes = 0
+                emoji_pairs = [
+                    ("🟢", "🔴"), ("✅", "❌"), ("🔥", "😞"), ("💯", "😵"), ("😎", "😭"), ("🚀", "🛑"), ("🌟", "👎"), ("🥇", "🥀"), ("🍀", "🪦"), ("🎉", "😬")
+                ]
+                emoji_pair = secrets.choice(emoji_pairs)
+                msg, keyboard, _ = format_canva_post_message(latest, working_votes=working_votes, not_working_votes=not_working_votes, emoji_pair=emoji_pair)
+                sent_msg = await context.bot.send_message(chat_id=CHANNEL_ID, text=msg, parse_mode="HTML", reply_markup=keyboard)
+                vote_data[sent_msg.message_id] = {'working': working_votes, 'not_working': not_working_votes, 'voters': set(), 'emoji_pair': emoji_pair}
+                last_posted_link = latest
+                logger.info(f"[auto_posting_task] Posted new link: {latest}")
+                # Delayed bump for auto-posts too
+                async def delayed_bump(msg_id, link, emoji_pair):
+                    await asyncio.sleep(10)
+                    bump_votes = random.randint(4, 6)
+                    vote_data[msg_id]['working'] = bump_votes
+                    msg, keyboard, _ = format_canva_post_message(link, working_votes=bump_votes, not_working_votes=0, emoji_pair=emoji_pair)
+                    try:
+                        await context.bot.edit_message_reply_markup(chat_id=CHANNEL_ID, message_id=msg_id, reply_markup=keyboard)
+                    except Exception:
+                        pass
+                asyncio.create_task(delayed_bump(sent_msg.message_id, latest, emoji_pair))
+        except Exception as e:
+            logger.error(f"[auto_posting_task] Error: {e}")
+
 def main():
-    # Build & register handlers
     app = ApplicationBuilder().token(BOT_TOKEN).build()
-    for cmd, fn in [("start", start), ("help", help_command),
-                    ("post", post), ("lastlink", lastlink),
-                    ("logs", logs), ("health", health),
-                    ("restart", restart)]:
+    for cmd, fn in [
+        ("start", start), ("help", help_command),
+        ("post", post), ("lastlink", lastlink),
+        ("logs", logs), ("health", health),
+        ("restart", restart)
+    ]:
         app.add_handler(CommandHandler(cmd, fn))
     app.add_handler(CallbackQueryHandler(vote_callback, pattern=r"^vote_"))
-    # Kick off background services on the running loop
+    # Start health server and auto-posting
     loop = asyncio.get_event_loop()
     loop.create_task(start_health_server())
+    loop.create_task(auto_posting_task(app))
     logger.info("Starting polling…")
     app.run_polling()
 
