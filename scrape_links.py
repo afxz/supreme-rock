@@ -16,17 +16,28 @@ USER_AGENTS = [
 # Fetch a list of free HTTPS proxies
 async def fetch_free_proxies():
     url = "https://free-proxy-list.net/"
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as resp:
-            text = await resp.text()
-    soup = BeautifulSoup(text, 'html.parser')
-    rows = soup.select("#proxylisttable tbody tr")
     proxies = []
-    for row in rows:
-        cols = row.find_all('td')
-        ip, port, https = cols[0].text.strip(), cols[1].text.strip(), cols[6].text.strip()
-        if https.lower() == 'yes':
-            proxies.append(f"http://{ip}:{port}")
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                text = await resp.text()
+        soup = BeautifulSoup(text, 'html.parser')
+        rows = soup.select("#proxylisttable tbody tr")
+        for row in rows:
+            cols = row.find_all('td')
+            ip, port, https = cols[0].text.strip(), cols[1].text.strip(), cols[6].text.strip()
+            if https.lower() == 'yes':
+                proxies.append(f"http://{ip}:{port}")
+        print(f"[fetch_free_proxies] Got {len(proxies)} proxies from site.")
+    except Exception as e:
+        print(f"[fetch_free_proxies] Error fetching proxies: {e}")
+    # Fallback: use static proxies if none found
+    if not proxies:
+        proxies = [
+            # Add known working proxies here for testing, or leave empty
+            # "http://1.2.3.4:8080",
+        ]
+        print(f"[fetch_free_proxies] Using fallback proxy list: {proxies}")
     return proxies
 
 # Build stealth headers
