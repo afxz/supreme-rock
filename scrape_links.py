@@ -15,29 +15,50 @@ USER_AGENTS = [
 
 # Fetch a list of free HTTPS proxies
 async def fetch_free_proxies():
-    url = "https://free-proxy-list.net/"
-    proxies = []
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as resp:
-                text = await resp.text()
-        soup = BeautifulSoup(text, 'html.parser')
-        rows = soup.select("#proxylisttable tbody tr")
-        for row in rows:
-            cols = row.find_all('td')
-            ip, port, https = cols[0].text.strip(), cols[1].text.strip(), cols[6].text.strip()
-            if https.lower() == 'yes':
-                proxies.append(f"http://{ip}:{port}")
-        print(f"[fetch_free_proxies] Got {len(proxies)} proxies from site.")
-    except Exception as e:
-        print(f"[fetch_free_proxies] Error fetching proxies: {e}")
-    # Fallback: use static proxies if none found
+    import re
+    import random
+    proxies = set()
+    sources = [
+        "https://free-proxy-list.net/",
+        "https://www.sslproxies.org/",
+        "https://www.us-proxy.org/",
+        "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt"
+    ]
+    for url in sources:
+        try:
+            timeout = aiohttp.ClientTimeout(total=15)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(url) as resp:
+                    text = await resp.text()
+            if url.endswith('.txt'):
+                # Plain text list
+                for line in text.splitlines():
+                    if re.match(r'^\d+\.\d+\.\d+\.\d+:\d+$', line.strip()):
+                        proxies.add(f"http://{line.strip()}")
+            else:
+                soup = BeautifulSoup(text, 'html.parser')
+                rows = soup.select("#proxylisttable tbody tr")
+                for row in rows:
+                    cols = row.find_all('td')
+                    if len(cols) >= 7:
+                        ip, port, https = cols[0].text.strip(), cols[1].text.strip(), cols[6].text.strip()
+                        if https.lower() == 'yes':
+                            proxies.add(f"http://{ip}:{port}")
+            print(f"[fetch_free_proxies] {url} yielded {len(proxies)} proxies so far.")
+        except Exception as e:
+            print(f"[fetch_free_proxies] Error fetching from {url}: {e}")
+    proxies = list(proxies)
+    random.shuffle(proxies)
+    # Fallback: use a larger static list if none found
     if not proxies:
         proxies = [
-            # Add known working proxies here for testing, or leave empty
-            # "http://1.2.3.4:8080",
+            "http://51.158.68.68:8811", "http://51.159.115.233:3128", "http://134.209.29.120:3128", "http://64.225.8.82:9981", "http://64.225.8.132:9981",
+            "http://103.152.232.66:3125", "http://103.151.177.106:80", "http://103.155.54.26:83", "http://103.155.54.26:84", "http://103.155.54.26:82",
+            "http://103.155.54.26:81", "http://103.155.54.26:80", "http://103.155.54.26:3125", "http://103.155.54.26:3128", "http://103.155.54.26:8080"
         ]
-        print(f"[fetch_free_proxies] Using fallback proxy list: {proxies}")
+        print(f"[fetch_free_proxies] Using large fallback proxy list: {proxies}")
+    else:
+        print(f"[fetch_free_proxies] Total unique proxies fetched: {len(proxies)}")
     return proxies
 
 # Build stealth headers
