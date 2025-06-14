@@ -13,7 +13,7 @@ async def lastlink(update: Update, context):
     if not message or not hasattr(message, 'reply_text'):
         return
     user = update.effective_user
-    from bot_manual import last_posted_link
+    from bot import last_posted_link
     if user and user.id == BOT_ADMIN_ID:
         if last_posted_link:
             await message.reply_text(f"Last posted link: {last_posted_link}")

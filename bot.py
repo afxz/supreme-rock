@@ -21,7 +21,6 @@ from config import BOT_TOKEN, CHANNEL_ID, BOT_ADMIN_ID, IMPORTANT_LOG_PATH
 import aiohttp
 from bs4 import BeautifulSoup
 from admin_commands import lastlink, logs, health, restart
-from proxy_pool import ProxyPool, save_proxy_state, load_proxy_state
 
 # --- Logging Setup ---
 logging.basicConfig(
@@ -72,14 +71,11 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         txt = (
             "<b>Admin Commands:</b>\n"
             "/post - Scrape & post the latest link\n"
-            "/proxies - Show proxy pool state and blacklist\n"
             "/help - This menu\n\n"
             "<b>Auto-Posting Info:</b>\n"
             "• The bot automatically checks for new Canva links every 5–10 minutes (randomized).\n"
             "• A new link is posted to the channel as soon as it is detected.\n"
-            "• Scraping uses a smart proxy pool to avoid bans and maximize reliability.\n"
-            "• Proxies are blacklisted after 3 consecutive failures and never used again.\n"
-            "• Proxy stats and blacklist are saved to disk and persist across restarts.\n\n"
+            "• Scraping is now direct (no proxies).\n\n"
             "<b>Channel Post Format:</b>\n"
             "- Each post contains the Canva link, a proof/verification instruction, and two buttons: Share Channel and Join Backup.\n"
             "- Users can vote if the link is working or not using fun random emojis. Vote counts update live.\n"
@@ -236,7 +232,7 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if try_count == 0:
                     log_important(f"/post at {message.date}")
             await asyncio.sleep(random.uniform(1, 2.5))
-            latest = await get_latest_canva_link_with_proxy_pool(use_proxy=True)
+            latest = await get_latest_canva_link()
             if latest and latest != last_posted_link:
                 working_votes = 0
                 not_working_votes = 0
@@ -293,150 +289,13 @@ async def start_health_server():
     await site.start()
     logger.info("Health server running on :8080")
 
-# --- Proxy Pool Management ---
-import json
-import os
-import time
-
-PROXY_STATS_PATH = "proxy_stats.json"
-PROXY_BLACKLIST_PATH = "proxy_blacklist.json"
-BLACKLIST_FAILS = 3
-
-def save_proxy_state(proxy_pool):
-    # Save stats and blacklist
-    try:
-        with open(PROXY_STATS_PATH, "w") as f:
-            json.dump(proxy_pool.stats, f)
-        with open(PROXY_BLACKLIST_PATH, "w") as f:
-            json.dump(list(proxy_pool.bad_proxies), f)
-    except Exception as e:
-        logger.error(f"[ProxyPool] Failed to save state: {e}")
-
-def load_proxy_state(proxy_pool):
-    # Load stats and blacklist
-    try:
-        if os.path.exists(PROXY_STATS_PATH):
-            with open(PROXY_STATS_PATH, "r") as f:
-                stats = json.load(f)
-                for k, v in stats.items():
-                    proxy_pool.stats[k] = v
-        if os.path.exists(PROXY_BLACKLIST_PATH):
-            with open(PROXY_BLACKLIST_PATH, "r") as f:
-                proxy_pool.bad_proxies = set(json.load(f))
-    except Exception as e:
-        logger.error(f"[ProxyPool] Failed to load state: {e}")
-
-# Remove ProxyPool and related functions from this file, use the imported one
-proxy_pool = ProxyPool()
-
-# --- /proxies admin command ---
-async def proxies_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    message = update.message
-    if not (user and user.id == BOT_ADMIN_ID):
-        if message and hasattr(message, 'reply_text'):
-            return await message.reply_text("🚫 Unauthorized.")
-        return
-    lines = ["<b>Proxy Pool State:</b>"]
-    for p in list(proxy_pool.proxies)[:10]:
-        s = proxy_pool.stats[p]
-        lines.append(f"<code>{p}</code>\n  success={s['success']} fail={s['fail']} consec_fail={s.get('consec_fail', 0)}")
-    if len(proxy_pool.proxies) > 10:
-        lines.append(f"...and {len(proxy_pool.proxies)-10} more.")
-    if proxy_pool.bad_proxies:
-        lines.append("\n<b>Blacklisted:</b>")
-        for p in list(proxy_pool.bad_proxies)[:10]:
-            lines.append(f"<code>{p}</code>")
-        if len(proxy_pool.bad_proxies) > 10:
-            lines.append(f"...and {len(proxy_pool.bad_proxies)-10} more.")
-    if message and hasattr(message, 'reply_text'):
-        await message.reply_text("\n".join(lines), parse_mode="HTML")
-
-# --- Enhanced error handling in get_latest_canva_link_with_proxy_pool ---
-async def get_latest_canva_link_with_proxy_pool(retries=3, use_proxy=True):
-    from scrape_links import fetch_free_proxies, get_stealth_headers
-    import bs4
-    main_url = "https://bingotingo.com/best-social-media-platforms/"
-    import ssl
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    connector = aiohttp.TCPConnector(limit=5, ssl=ctx)
-    await proxy_pool.refresh(fetch_free_proxies)
-    last_error = None
-    for attempt in range(retries):
-        proxy = proxy_pool.get_proxy() if use_proxy else None
-        try:
-            async with aiohttp.ClientSession(connector=connector) as session:
-                headers = get_stealth_headers()
-                logger.info(f"[Scraper] Attempt {attempt+1}/{retries} using proxy: {proxy}")
-                resp1 = await session.get(main_url, headers=headers, proxy=proxy)
-                if resp1.status in (403, 429):
-                    reason = f"Blocked (HTTP {resp1.status}) on main page"
-                    proxy_pool.report(proxy, False, reason)
-                    logger.error(f"[Scraper] {reason} with proxy {proxy}")
-                    last_error = reason
-                    continue
-                resp1.raise_for_status()
-                soup1 = BeautifulSoup(await resp1.text(), 'html.parser')
-                download_btn = soup1.select_one('a.su-button')
-                if not download_btn:
-                    reason = "No download button found on main page"
-                    proxy_pool.report(proxy, False, reason)
-                    logger.error(f"[Scraper] {reason} with proxy {proxy}")
-                    last_error = reason
-                    continue
-                latest_link = download_btn.get('href') if hasattr(download_btn, 'get') else None
-                if not isinstance(latest_link, str):
-                    reason = "Download button href is not a string"
-                    proxy_pool.report(proxy, False, reason)
-                    logger.error(f"[Scraper] {reason} with proxy {proxy}")
-                    last_error = reason
-                    continue
-                await asyncio.sleep(random.uniform(1.0, 2.5))
-                headers = get_stealth_headers()
-                resp2 = await session.get(latest_link, headers=headers, proxy=proxy)
-                if resp2.status in (403, 429):
-                    reason = f"Blocked (HTTP {resp2.status}) on redirect page"
-                    proxy_pool.report(proxy, False, reason)
-                    logger.error(f"[Scraper] {reason} with proxy {proxy}")
-                    last_error = reason
-                    continue
-                resp2.raise_for_status()
-                soup2 = BeautifulSoup(await resp2.text(), 'html.parser')
-                canva_link = None
-                for a in soup2.find_all('a'):
-                    if isinstance(a, bs4.element.Tag):
-                        if 'href' in a.attrs:
-                            href = a.attrs['href']
-                            if isinstance(href, str) and href.startswith('https://www.canva.com/brand/'):
-                                canva_link = href
-                                break
-                if not canva_link:
-                    reason = "Canva link not found on redirected page"
-                    proxy_pool.report(proxy, False, reason)
-                    logger.error(f"[Scraper] {reason} with proxy {proxy}")
-                    last_error = reason
-                    continue
-                proxy_pool.report(proxy, True)
-                logger.info(f"[Scraper] Success! Canva link: {canva_link}")
-                return canva_link
-        except Exception as e:
-            proxy_pool.report(proxy, False, str(e))
-            logger.error(f"[Scraper] Exception with proxy {proxy}: {e}")
-            last_error = str(e)
-        proxy_pool.debug_state()
-        await asyncio.sleep(random.uniform(2, 5))
-    logger.error(f"[Scraper] All proxies failed or no link found. Last error: {last_error}")
-    raise Exception(f"All proxies failed or no link found. Last error: {last_error}")
-
 # --- Auto-posting background task ---
 async def auto_posting_task(context):
     global last_posted_link
     while True:
         try:
             await asyncio.sleep(random.randint(300, 600))  # 5–10 min
-            latest = await get_latest_canva_link_with_proxy_pool(use_proxy=True)
+            latest = await get_latest_canva_link()
             if latest and latest != last_posted_link:
                 working_votes = 0
                 not_working_votes = 0
@@ -466,7 +325,6 @@ async def auto_posting_task(context):
 # --- Register handlers in main() ---
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("proxies", proxies_command))
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("post", post))

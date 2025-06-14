@@ -4,8 +4,13 @@ import random
 import ssl
 from bs4 import BeautifulSoup
 import bs4
+import requests
+import logging
+import os
+from dotenv import load_dotenv
 
-# List of rotating user agents
+load_dotenv()
+
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36",
@@ -13,173 +18,134 @@ USER_AGENTS = [
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
 ]
 
-# Fetch a list of free HTTPS proxies
-async def fetch_free_proxies():
-    import re
-    import random
-    proxies = set()
-    sources = [
-        "https://free-proxy-list.net/",
-        "https://www.sslproxies.org/",
-        "https://www.us-proxy.org/",
-        "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt"
-    ]
-    for url in sources:
+logger = logging.getLogger("scrape_links")
+
+MAIN_URL = "https://bingotingo.com/best-social-media-platforms/"
+BROWSERLESS_TOKEN = os.getenv("BROWSERLESS_TOKEN")
+SCRAPEDO_TOKEN = os.getenv("SCRAPEDO_TOKEN")
+
+# --- Browserless (BrowserQL) provider ---
+def get_canva_link_browserless():
+    if not BROWSERLESS_TOKEN:
+        logger.error("[Browserless] API token not set in environment variable BROWSERLESS_TOKEN.")
+        return None
+    url = f"https://production-sfo.browserless.io/graphql?token={BROWSERLESS_TOKEN}"
+    try:
+        # Step 1: Fetch main page
+        query1 = f'''
+        mutation {{
+          goto(url: \"{MAIN_URL}\", waitUntil: firstContentfulPaint) {{ status }}
+          html {{ html }}
+        }}
+        '''
+        resp1 = requests.post(url, json={"query": query1}, timeout=30)
+        data1 = resp1.json()
+        html1 = data1["data"]["html"]["html"]
+        soup1 = BeautifulSoup(html1, "html.parser")
+        btn = soup1.select_one("a.su-button")
+        if not btn or not btn.get("href"):
+            logger.warning("[Browserless] No redirect button found.")
+            return None
+        redirect_url = btn["href"]
+        # Step 2: Fetch redirect page
+        query2 = f'''
+        mutation {{
+          goto(url: \"{redirect_url}\", waitUntil: firstContentfulPaint) {{ status }}
+          html {{ html }}
+        }}
+        '''
+        resp2 = requests.post(url, json={"query": query2}, timeout=30)
+        data2 = resp2.json()
+        html2 = data2["data"]["html"]["html"]
+        soup2 = BeautifulSoup(html2, "html.parser")
+        for a in soup2.find_all('a'):
+            if isinstance(a, bs4.element.Tag):
+                href = a.get('href')
+                if isinstance(href, str) and href.startswith('https://www.canva.com/brand/'):
+                    logger.info("[Browserless] Found Canva link.")
+                    return href
+        logger.warning("[Browserless] No Canva link found on redirect page.")
+        return None
+    except Exception as e:
+        logger.error(f"[Browserless] Exception: {e}")
+        return None
+
+# --- Scrape.do provider ---
+def get_canva_link_scrapedo():
+    if not SCRAPEDO_TOKEN:
+        logger.error("[Scrape.do] API token not set in environment variable SCRAPEDO_TOKEN.")
+        return None
+    api_url = "http://api.scrape.do"
+    try:
+        params = {
+            "token": SCRAPEDO_TOKEN,
+            "url": MAIN_URL
+        }
+        resp1 = requests.get(api_url, params=params, timeout=30)
+        html1 = resp1.text
+        soup1 = BeautifulSoup(html1, "html.parser")
+        btn = soup1.select_one("a.su-button")
+        if not btn or not btn.get("href"):
+            logger.warning("[Scrape.do] No redirect button found.")
+            return None
+        redirect_url = btn["href"]
+        # Step 2: Fetch redirect page
+        params2 = {
+            "token": SCRAPEDO_TOKEN,
+            "url": redirect_url
+        }
+        resp2 = requests.get(api_url, params=params2, timeout=30)
+        html2 = resp2.text
+        soup2 = BeautifulSoup(html2, "html.parser")
+        for a in soup2.find_all('a'):
+            if isinstance(a, bs4.element.Tag):
+                href = a.get('href')
+                if isinstance(href, str) and href.startswith('https://www.canva.com/brand/'):
+                    logger.info("[Scrape.do] Found Canva link.")
+                    return href
+        logger.warning("[Scrape.do] No Canva link found on redirect page.")
+        return None
+    except Exception as e:
+        logger.error(f"[Scrape.do] Exception: {e}")
+        return None
+
+# --- Try both providers before retrying ---
+def get_latest_canva_link_via_api():
+    providers = [get_canva_link_browserless, get_canva_link_scrapedo]
+    random.shuffle(providers)
+    errors = []
+    for provider in providers:
         try:
-            timeout = aiohttp.ClientTimeout(total=15)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(url) as resp:
-                    text = await resp.text()
-            if url.endswith('.txt'):
-                # Plain text list
-                for line in text.splitlines():
-                    if re.match(r'^\d+\.\d+\.\d+\.\d+:\d+$', line.strip()):
-                        proxies.add(f"http://{line.strip()}")
+            link = provider()
+            if link:
+                logger.info(f"[Scraper] Success with {provider.__name__}")
+                return link
             else:
-                soup = BeautifulSoup(text, 'html.parser')
-                rows = soup.select("#proxylisttable tbody tr")
-                for row in rows:
-                    cols = row.find_all('td')
-                    if len(cols) >= 7:
-                        ip, port, https = cols[0].text.strip(), cols[1].text.strip(), cols[6].text.strip()
-                        if https.lower() == 'yes':
-                            proxies.add(f"http://{ip}:{port}")
-            print(f"[fetch_free_proxies] {url} yielded {len(proxies)} proxies so far.")
+                errors.append(f"{provider.__name__} returned no link.")
         except Exception as e:
-            print(f"[fetch_free_proxies] Error fetching from {url}: {e}")
-    proxies = list(proxies)
-    random.shuffle(proxies)
-    # Fallback: use a larger static list if none found
-    if not proxies:
-        proxies = [
-            "http://51.158.68.68:8811", "http://51.159.115.233:3128", "http://134.209.29.120:3128", "http://64.225.8.82:9981", "http://64.225.8.132:9981",
-            "http://103.152.232.66:3125", "http://103.151.177.106:80", "http://103.155.54.26:83", "http://103.155.54.26:84", "http://103.155.54.26:82",
-            "http://103.155.54.26:81", "http://103.155.54.26:80", "http://103.155.54.26:3125", "http://103.155.54.26:3128", "http://103.155.54.26:8080"
-        ]
-        print(f"[fetch_free_proxies] Using large fallback proxy list: {proxies}")
-    else:
-        print(f"[fetch_free_proxies] Total unique proxies fetched: {len(proxies)}")
-    return proxies
+            logger.error(f"[Scraper] {provider.__name__} failed: {e}")
+            errors.append(f"{provider.__name__} exception: {e}")
+    logger.error(f"[Scraper] Both providers failed: {' | '.join(errors)}")
+    return None
 
-# Build stealth headers
-def get_stealth_headers():
-    return {
-        "User-Agent": random.choice(USER_AGENTS),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Referer": "https://www.google.com/",
-        "Connection": "keep-alive",
-        "DNT": "1",
-        "Upgrade-Insecure-Requests": "1",
-        "Cache-Control": "max-age=0",
-        "Pragma": "no-cache"
-    }
-
-# Main scraper function
-async def get_latest_canva_link(retries=3, use_proxy=True):
-    main_url = "https://bingotingo.com/best-social-media-platforms/"
-    # Disable SSL verify (Codespaces friendly)
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    connector = aiohttp.TCPConnector(limit=5, ssl=ctx)
-
-    # Prepare proxies and headers
-    proxies = await fetch_free_proxies() if use_proxy else []
-    proxy = random.choice(proxies) if proxies else None
-
-    async with aiohttp.ClientSession(connector=connector) as session:
-        try:
-            # Step 1: fetch main page
-            headers = get_stealth_headers()
-            resp1 = await session.get(main_url, headers=headers, proxy=proxy if use_proxy and proxy else None)
-            resp1.raise_for_status()
-            soup1 = BeautifulSoup(await resp1.text(), 'html.parser')
-            download_btn = soup1.select_one('a.su-button')
-            if not download_btn:
-                raise Exception("Download button not found on main page")
-            latest_link = download_btn.get('href') if hasattr(download_btn, 'get') else None
-            if not isinstance(latest_link, str):
-                raise Exception("Download button href is not a string")
-            await asyncio.sleep(random.uniform(1.0, 2.5))
-
-            # Step 2: fetch redirect page
-            headers = get_stealth_headers()
-            resp2 = await session.get(latest_link, headers=headers, proxy=proxy if use_proxy and proxy else None)
-            resp2.raise_for_status()
-            soup2 = BeautifulSoup(await resp2.text(), 'html.parser')
-            # Find the first <a> tag with an href that starts with the Canva brand link
-            canva_link = None
-            for a in soup2.find_all('a'):
-                if isinstance(a, bs4.element.Tag):
-                    href = a.attrs.get('href', None)
-                    if isinstance(href, str) and href.startswith('https://www.canva.com/brand/'):
-                        canva_link = href
-                        break
-            if not canva_link:
-                raise Exception("Canva link not found on redirected page")
-            return canva_link
-
-        except Exception as e:
-            if retries > 0:
-                wait = random.uniform(2, 5)
-                await asyncio.sleep(wait)
-                return await get_latest_canva_link(retries - 1, use_proxy=use_proxy)
-            else:
-                raise
-
-# Main scraper function with ProxyPool
-async def get_latest_canva_link_with_proxy_pool(proxy_pool, retries=3, use_proxy=True):
-    main_url = "https://bingotingo.com/best-social-media-platforms/"
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    connector = aiohttp.TCPConnector(limit=5, ssl=ctx)
-    await proxy_pool.refresh(fetch_free_proxies)
+# --- Async wrapper for bot usage ---
+async def get_latest_canva_link(retries=3):
     for attempt in range(retries):
-        proxy = proxy_pool.get_proxy() if use_proxy else None
-        try:
-            async with aiohttp.ClientSession(connector=connector) as session:
-                headers = get_stealth_headers()
-                resp1 = await session.get(main_url, headers=headers, proxy=proxy)
-                resp1.raise_for_status()
-                soup1 = BeautifulSoup(await resp1.text(), 'html.parser')
-                download_btn = soup1.select_one('a.su-button')
-                if not download_btn:
-                    raise Exception("Download button not found on main page")
-                # Fix: download_btn['href'] is a Tag, ensure it's a string
-                latest_link = str(download_btn.get('href', ''))
-                await asyncio.sleep(random.uniform(1.0, 2.5))
-                headers = get_stealth_headers()
-                resp2 = await session.get(latest_link, headers=headers, proxy=proxy)
-                resp2.raise_for_status()
-                soup2 = BeautifulSoup(await resp2.text(), 'html.parser')
-                # Fix: robustly extract href attribute as string from Tag using dict access
-                canva_link = None
-                for a in soup2.find_all('a'):
-                    href = None
-                    # Only process if a is a Tag (not NavigableString/PageElement)
-                    if isinstance(a, bs4.element.Tag):
-                        if 'href' in a.attrs:
-                            href = a.attrs['href']
-                    if isinstance(href, str) and href.startswith('https://www.canva.com/brand/'):
-                        canva_link = href
-                        break
-                if not canva_link:
-                    raise Exception("Canva link not found on redirected page")
-                proxy_pool.report(proxy, True)
-                return canva_link
-        except Exception as e:
-            proxy_pool.report(proxy, False)
-            if attempt == retries - 1:
-                raise
-            await asyncio.sleep(random.uniform(2, 5))
-    raise Exception("All proxies failed or no link found.")
+        link = await asyncio.to_thread(get_latest_canva_link_via_api)
+        if link:
+            return link
+        logger.warning(f"[Scraper] Attempt {attempt+1} failed, retrying...")
+        await asyncio.sleep(random.uniform(2, 5))
+    raise Exception("All providers failed to fetch Canva link after retries.")
 
-# Entry point
-if __name__ == "__main__":
+# Entry point for manual testing
+def main():
+    logging.basicConfig(level=logging.INFO)
     try:
         link = asyncio.run(get_latest_canva_link())
         print(f"✅ Canva Link: {link}")
     except Exception as e:
         print(f"🔥 Fatal Error: {e}")
+
+if __name__ == "__main__":
+    main()
