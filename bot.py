@@ -294,7 +294,7 @@ async def auto_posting_task(context):
     global last_posted_link
     while True:
         try:
-            await asyncio.sleep(random.randint(300, 600))  # 5–10 min
+            await asyncio.sleep(random.randint(2400, 3000))  # 40–50 min
             latest = await get_latest_canva_link()
             if latest and latest != last_posted_link:
                 working_votes = 0
