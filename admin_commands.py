@@ -1,6 +1,7 @@
 import logging
 from telegram import Update
 from config import BOT_ADMIN_ID, IMPORTANT_LOG_PATH
+from shared import last_posted_link
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +14,6 @@ async def lastlink(update: Update, context):
     if not message or not hasattr(message, 'reply_text'):
         return
     user = update.effective_user
-    from bot import last_posted_link
     if user and user.id == BOT_ADMIN_ID:
         if last_posted_link:
             await message.reply_text(f"Last posted link: {last_posted_link}")

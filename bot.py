@@ -18,6 +18,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, Callb
 from scrape_links import get_latest_canva_link
 from config import BOT_TOKEN, CHANNEL_ID, BOT_ADMIN_ID, IMPORTANT_LOG_PATH
 from auto_posting import auto_posting_task
+from shared import vote_data, last_posted_link, format_canva_post_message, EMOJI_PAIRS
 
 import aiohttp
 from bs4 import BeautifulSoup
@@ -45,7 +46,6 @@ for log_file in ("bot.log", IMPORTANT_LOG_PATH):
 
 # --- Globals ---
 bot = Bot(token=BOT_TOKEN)
-last_posted_link = None
 
 def log_important(event: str):
     with open(IMPORTANT_LOG_PATH, "a") as f:
@@ -93,47 +93,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         if message and hasattr(message, 'reply_text'):
             await message.reply_text("🚫 Unauthorized.")
-
-# --- Voting Data ---
-vote_data = {}  # message_id: {'working': int, 'not_working': int, 'voters': set}
-
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import CallbackQueryHandler
-
-# --- Enhanced Message Formatting with Voting ---
-def format_canva_post_message(latest_link, working_votes=None, not_working_votes=None, emoji_pair=None):
-    import secrets
-    emoji_pairs = [
-        ("🟢", "🔴"), ("✅", "❌"), ("🔥", "😞"), ("💯", "😵"), ("😎", "😭"), ("🚀", "🛑"), ("🌟", "👎"), ("🥇", "🥀"), ("🍀", "🪦"), ("🎉", "😬")
-    ]
-    if emoji_pair is None:
-        emoji_pair = secrets.choice(emoji_pairs)
-    good_emoji, bad_emoji = emoji_pair
-    # 🎯 Goal line
-    goal_num = random.randint(4, 10)
-    msg = (
-        f"{good_emoji} <b>New Canva Pro Team Link:</b>\n"
-        f"<a href='{latest_link}'>{latest_link}</a>\n\n"
-        "🔔 <i>Unmute for instant access!</i>\n"
-        "🖼️ <b>Proof:</b> After joining, send a screenshot to <a href='https://t.me/aenzBot'>@aenzBot</a>.\n\n"
-        f"🎯 <b>Goal:</b> Let's hit <b>{goal_num}</b> reactions! 🚀\n"
-        "<code>React below to help others know if it works!</code>"
-    )
-    if working_votes is None:
-        working_votes = 0  # Start at 0, will be bumped after delay
-    if not_working_votes is None:
-        not_working_votes = 0
-    keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(f"{good_emoji} Working ({working_votes})", callback_data=f"vote_working|{good_emoji}|{bad_emoji}"),
-            InlineKeyboardButton(f"{bad_emoji} Not Working ({not_working_votes})", callback_data=f"vote_not_working|{good_emoji}|{bad_emoji}")
-        ],
-        [
-            InlineKeyboardButton("📣 Share Channel", url="https://t.me/share/url?url=https://t.me/CanvaProInviteLinks&text=✅ Unlock daily Canva Pro team links! Totally free, always fresh. ❤️"),
-            InlineKeyboardButton("Join Backup ⚠️", url="https://t.me/+ejp2_sjBtJczY2I9")
-        ]
-    ])
-    return msg, keyboard, emoji_pair
 
 # --- Voting Callback Handler ---
 import telegram
@@ -243,10 +202,7 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if latest and latest != last_posted_link:
                 working_votes = 0
                 not_working_votes = 0
-                emoji_pairs = [
-                    ("🟢", "🔴"), ("✅", "❌"), ("🔥", "😞"), ("💯", "😵"), ("😎", "😭"), ("🚀", "🛑"), ("🌟", "👎"), ("🥇", "🥀"), ("🍀", "🪦"), ("🎉", "😬")
-                ]
-                emoji_pair = secrets.choice(emoji_pairs)
+                emoji_pair = secrets.choice(EMOJI_PAIRS)
                 msg, keyboard, _ = format_canva_post_message(latest, working_votes=working_votes, not_working_votes=not_working_votes, emoji_pair=emoji_pair)
                 sent_msg = await context.bot.send_message(chat_id=CHANNEL_ID, text=msg, parse_mode="HTML", reply_markup=keyboard)
                 vote_data[sent_msg.message_id] = {'working': working_votes, 'not_working': not_working_votes, 'voters': set(), 'emoji_pair': emoji_pair}

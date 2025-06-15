@@ -3,7 +3,8 @@ import secrets
 import asyncio
 import logging
 from scrape_links import get_latest_canva_link
-from bot import format_canva_post_message, vote_data, last_posted_link, CHANNEL_ID
+from config import CHANNEL_ID
+from shared import format_canva_post_message, vote_data, last_posted_link, EMOJI_PAIRS
 
 logger = logging.getLogger(__name__)
 
@@ -16,11 +17,8 @@ async def auto_posting_task(context):
             if latest and latest != last_posted_link:
                 working_votes = 0
                 not_working_votes = 0
-                emoji_pairs = [
-                    ("🟢", "🔴"), ("✅", "❌"), ("🔥", "😞"), ("💯", "😵"), ("😎", "😭"), ("🚀", "🛑"), ("🌟", "👎"), ("🥇", "🥀"), ("🍀", "🪦"), ("🎉", "😬")
-                ]
-                emoji_pair = secrets.choice(emoji_pairs)
-                msg, keyboard, _ = format_canva_post_message(latest, working_votes=working_votes, not_working_votes=not_working_votes, emoji_pair=emoji_pair)
+                emoji_pair = secrets.choice(EMOJI_PAIRS)
+                msg, keyboard, emoji_pair = format_canva_post_message(latest, working_votes=working_votes, not_working_votes=not_working_votes, emoji_pair=emoji_pair)
                 sent_msg = await context.bot.send_message(chat_id=CHANNEL_ID, text=msg, parse_mode="HTML", reply_markup=keyboard)
                 vote_data[sent_msg.message_id] = {'working': working_votes, 'not_working': not_working_votes, 'voters': set(), 'emoji_pair': emoji_pair}
                 last_posted_link = latest
