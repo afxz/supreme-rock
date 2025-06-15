@@ -17,6 +17,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, Callb
 
 from scrape_links import get_latest_canva_link
 from config import BOT_TOKEN, CHANNEL_ID, BOT_ADMIN_ID, IMPORTANT_LOG_PATH
+from auto_posting import auto_posting_task
 
 import aiohttp
 from bs4 import BeautifulSoup
@@ -71,11 +72,17 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         txt = (
             "<b>Admin Commands:</b>\n"
             "/post - Scrape & post the latest link\n"
-            "/help - This menu\n\n"
+            "/help - This menu\n"
+            "/lastlink - Show the last posted Canva link\n"
+            "/logs - Show recent important logs\n"
+            "/health - Check bot health\n"
+            "/restart - Restart the bot (Koyeb will auto-restart)\n"
+            "\n"
             "<b>Auto-Posting Info:</b>\n"
-            "• The bot automatically checks for new Canva links every 5–10 minutes (randomized).\n"
+            "• The bot automatically checks for new Canva links every 40–50 minutes (randomized).\n"
             "• A new link is posted to the channel as soon as it is detected.\n"
-            "• Scraping is now direct (no proxies).\n\n"
+            "• Scraping is now done via Scrape.do only, with multiple API keys supported.\n"
+            "\n"
             "<b>Channel Post Format:</b>\n"
             "- Each post contains the Canva link, a proof/verification instruction, and two buttons: Share Channel and Join Backup.\n"
             "- Users can vote if the link is working or not using fun random emojis. Vote counts update live.\n"
@@ -288,39 +295,6 @@ async def start_health_server():
     site = web.TCPSite(runner, "0.0.0.0", 8080)
     await site.start()
     logger.info("Health server running on :8080")
-
-# --- Auto-posting background task ---
-async def auto_posting_task(context):
-    global last_posted_link
-    while True:
-        try:
-            await asyncio.sleep(random.randint(2400, 3000))  # 40–50 min
-            latest = await get_latest_canva_link()
-            if latest and latest != last_posted_link:
-                working_votes = 0
-                not_working_votes = 0
-                emoji_pairs = [
-                    ("🟢", "🔴"), ("✅", "❌"), ("🔥", "😞"), ("💯", "😵"), ("😎", "😭"), ("🚀", "🛑"), ("🌟", "👎"), ("🥇", "🥀"), ("🍀", "🪦"), ("🎉", "😬")
-                ]
-                emoji_pair = secrets.choice(emoji_pairs)
-                msg, keyboard, _ = format_canva_post_message(latest, working_votes=working_votes, not_working_votes=not_working_votes, emoji_pair=emoji_pair)
-                sent_msg = await context.bot.send_message(chat_id=CHANNEL_ID, text=msg, parse_mode="HTML", reply_markup=keyboard)
-                vote_data[sent_msg.message_id] = {'working': working_votes, 'not_working': not_working_votes, 'voters': set(), 'emoji_pair': emoji_pair}
-                last_posted_link = latest
-                logger.info(f"[auto_posting_task] Posted new link: {latest}")
-                # Delayed bump for auto-posts too
-                async def delayed_bump(msg_id, link, emoji_pair):
-                    await asyncio.sleep(10)
-                    bump_votes = random.randint(4, 6)
-                    vote_data[msg_id]['working'] = bump_votes
-                    msg, keyboard, _ = format_canva_post_message(link, working_votes=bump_votes, not_working_votes=0, emoji_pair=emoji_pair)
-                    try:
-                        await context.bot.edit_message_reply_markup(chat_id=CHANNEL_ID, message_id=msg_id, reply_markup=keyboard)
-                    except Exception:
-                        pass
-                asyncio.create_task(delayed_bump(sent_msg.message_id, latest, emoji_pair))
-        except Exception as e:
-            logger.error(f"[auto_posting_task] Error: {e}")
 
 # --- Register handlers in main() ---
 def main():

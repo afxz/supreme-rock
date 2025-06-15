@@ -34,11 +34,11 @@ def get_stealth_headers():
 logger = logging.getLogger("scrape_links")
 
 MAIN_URL = "https://bingotingo.com/best-social-media-platforms/"
-BROWSERLESS_TOKEN = os.getenv("BROWSERLESS_TOKEN")
-SCRAPEDO_TOKEN = os.getenv("SCRAPEDO_TOKEN")
+
+# Support multiple Scrape.do API keys (comma-separated in env)
+SCRAPEDO_TOKENS = [token.strip() for token in os.getenv("SCRAPEDO_TOKEN", "").split(",") if token.strip()]
 
 async def fetch_canva_link_from_redirect(redirect_url):
-    import aiohttp
     headers = get_stealth_headers()
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
@@ -55,58 +55,16 @@ async def fetch_canva_link_from_redirect(redirect_url):
                         return href
     return None
 
-# --- Browserless (BrowserQL) provider ---
-def get_canva_link_browserless_main():
-    if not BROWSERLESS_TOKEN:
-        logger.error("[Browserless] API token not set in environment variable BROWSERLESS_TOKEN.")
-        return None
-    endpoint = f"https://production-sfo.browserless.io/chromium/bql?token={BROWSERLESS_TOKEN}"
-    try:
-        query = '''
-        mutation Scrape($url: String!) {
-          reject(type: [image, media, font, stylesheet]) { enabled time }
-          goto(url: $url, waitUntil: firstContentfulPaint) { status }
-          waitFor(selector: \"a.su-button\", timeout: 65000) { selector }
-          html { html }
-        }
-        '''
-        variables = {"url": MAIN_URL}
-        resp = requests.post(endpoint, json={"query": query, "variables": variables}, timeout=70)
-        try:
-            data = resp.json()
-        except Exception as e:
-            logger.error(f"[Browserless] JSON decode error: {e}. Raw response: {resp.text}")
-            return None
-        html = data.get("data", {}).get("html", {}).get("html", "")
-        if not html:
-            logger.warning("[Browserless] No HTML returned for main page.")
-            return None
-        soup = BeautifulSoup(html, "html.parser")
-        btn = soup.select_one("a.su-button")
-        if not btn or not btn.get("href"):
-            logger.warning("[Browserless] No redirect button found. HTML snippet: %s", html[:500])
-            try:
-                with open("browserless_main.html", "w", encoding="utf-8") as f:
-                    f.write(html)
-                logger.info("[Browserless] Full HTML saved to browserless_main.html for inspection.")
-            except Exception as e:
-                logger.error(f"[Browserless] Failed to save HTML: {e}")
-            return None
-        redirect_url = btn["href"]
-        return redirect_url
-    except Exception as e:
-        logger.error(f"[Browserless] Exception: {e}")
-        return None
-
-# --- Scrape.do provider ---
+# --- Scrape.do provider (multi-key support) ---
 def get_canva_link_scrapedo_main():
-    if not SCRAPEDO_TOKEN:
-        logger.error("[Scrape.do] API token not set in environment variable SCRAPEDO_TOKEN.")
+    if not SCRAPEDO_TOKENS:
+        logger.error("[Scrape.do] No API tokens set in environment variable SCRAPEDO_TOKEN.")
         return None
     api_url = "http://api.scrape.do"
+    token = random.choice(SCRAPEDO_TOKENS)
     try:
         params = {
-            "token": SCRAPEDO_TOKEN,
+            "token": token,
             "url": MAIN_URL
         }
         resp = requests.get(api_url, params=params, timeout=30)
@@ -122,23 +80,17 @@ def get_canva_link_scrapedo_main():
         logger.error(f"[Scrape.do] Exception: {e}")
         return None
 
-# --- Try both providers for MAIN_URL, then fetch redirect locally ---
+# --- Main scraping logic (Scrape.do only) ---
 def get_latest_redirect_link_via_api():
-    providers = [get_canva_link_browserless_main, get_canva_link_scrapedo_main]
-    random.shuffle(providers)
-    errors = []
-    for provider in providers:
-        try:
-            link = provider()
-            if link:
-                logger.info(f"[Scraper] Success with {provider.__name__}")
-                return link
-            else:
-                errors.append(f"{provider.__name__} returned no link.")
-        except Exception as e:
-            logger.error(f"[Scraper] {provider.__name__} failed: {e}")
-            errors.append(f"{provider.__name__} exception: {e}")
-    logger.error(f"[Scraper] Both providers failed: {' | '.join(errors)}")
+    try:
+        link = get_canva_link_scrapedo_main()
+        if link:
+            logger.info("[Scraper] Success with Scrape.do")
+            return link
+        else:
+            logger.error("[Scraper] Scrape.do returned no link.")
+    except Exception as e:
+        logger.error(f"[Scraper] Scrape.do failed: {e}")
     return None
 
 # --- Async wrapper for bot usage ---
