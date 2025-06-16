@@ -39,20 +39,32 @@ MAIN_URL = "https://bingotingo.com/best-social-media-platforms/"
 SCRAPEDO_TOKENS = [token.strip() for token in os.getenv("SCRAPEDO_TOKEN", "").split(",") if token.strip()]
 
 async def fetch_canva_link_from_redirect(redirect_url):
-    headers = get_stealth_headers()
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    connector = aiohttp.TCPConnector(limit=5, ssl=ctx)
-    async with aiohttp.ClientSession(connector=connector) as session:
-        async with session.get(redirect_url, headers=headers) as resp:
-            html = await resp.text()
-            soup = BeautifulSoup(html, "html.parser")
-            for a in soup.find_all('a'):
-                if isinstance(a, bs4.element.Tag):
-                    href = a.get('href')
-                    if isinstance(href, str) and href.startswith('https://www.canva.com/brand/'):
-                        return href
+    """
+    Fetch the redirect page using Scrape.do and extract the Canva link.
+    """
+    if not SCRAPEDO_TOKENS:
+        logger.error("[Scrape.do] No API tokens set in environment variable SCRAPEDO_TOKEN.")
+        return None
+    api_url = "http://api.scrape.do"
+    token = random.choice(SCRAPEDO_TOKENS)
+    params = {
+        "token": token,
+        "url": redirect_url
+    }
+    try:
+        # Use requests in a thread to avoid blocking event loop
+        def fetch_html():
+            resp = requests.get(api_url, params=params, timeout=30)
+            return resp.text
+        html = await asyncio.to_thread(fetch_html)
+        soup = BeautifulSoup(html, "html.parser")
+        for a in soup.find_all('a'):
+            if isinstance(a, bs4.element.Tag):
+                href = a.get('href')
+                if isinstance(href, str) and href.startswith('https://www.canva.com/brand/'):
+                    return href
+    except Exception as e:
+        logger.error(f"[Scrape.do] Exception in fetch_canva_link_from_redirect: {e}")
     return None
 
 # --- Scrape.do provider (multi-key support) ---
