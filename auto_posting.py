@@ -8,11 +8,21 @@ from shared import format_canva_post_message, vote_data, last_posted_link, EMOJI
 
 logger = logging.getLogger(__name__)
 
+# Global auto-posting interval (in seconds)
+auto_post_min = 2400  # default 40 min
+auto_post_max = 3000  # default 50 min
+
+def set_auto_post_interval(min_sec, max_sec):
+    global auto_post_min, auto_post_max
+    auto_post_min = min_sec
+    auto_post_max = max_sec
+    logger.info(f"[auto_posting_task] Interval updated: {auto_post_min}-{auto_post_max} seconds")
+
 async def auto_posting_task(context):
     global last_posted_link
     while True:
         try:
-            await asyncio.sleep(random.randint(2400, 3000))  # 40–50 min
+            await asyncio.sleep(random.randint(auto_post_min, auto_post_max))
             latest = await get_latest_canva_link()
             if latest and latest != last_posted_link:
                 working_votes = 0

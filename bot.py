@@ -17,8 +17,9 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, Callb
 
 from scrape_links import get_latest_canva_link
 from config import BOT_TOKEN, CHANNEL_ID, BOT_ADMIN_ID, IMPORTANT_LOG_PATH
-from auto_posting import auto_posting_task
+from auto_posting import auto_posting_task, set_auto_post_interval
 from shared import vote_data, last_posted_link, format_canva_post_message, EMOJI_PAIRS
+from strings import HELP_MSG, START_MSG, UNAUTHORIZED_MSG, USAGE_SETINTERVAL, INVALID_INTERVAL, ERROR_GENERIC
 
 import aiohttp
 from bs4 import BeautifulSoup
@@ -60,39 +61,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if message and hasattr(message, 'date'):
             log_important(f"/start by admin at {message.date}")
         if message and hasattr(message, 'reply_text'):
-            await message.reply_text("🎉 Bot started! Use /help to see commands.")
+            await message.reply_text(START_MSG)
     else:
         if message and hasattr(message, 'reply_text'):
-            await message.reply_text("🚫 You’re not authorized.")
+            await message.reply_text(UNAUTHORIZED_MSG)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     message = update.message
     if user and user.id == BOT_ADMIN_ID:
-        txt = (
-            "<b>Admin Commands:</b>\n"
-            "/post - Scrape & post the latest link\n"
-            "/help - This menu\n"
-            "/lastlink - Show the last posted Canva link\n"
-            "/logs - Show recent important logs\n"
-            "/health - Check bot health\n"
-            "/restart - Restart the bot (Koyeb will auto-restart)\n"
-            "\n"
-            "<b>Auto-Posting Info:</b>\n"
-            "• The bot automatically checks for new Canva links every 40–50 minutes (randomized).\n"
-            "• A new link is posted to the channel as soon as it is detected.\n"
-            "• Scraping is now done via Scrape.do only, with multiple API keys supported.\n"
-            "\n"
-            "<b>Channel Post Format:</b>\n"
-            "- Each post contains the Canva link, a proof/verification instruction, and two buttons: Share Channel and Join Backup.\n"
-            "- Users can vote if the link is working or not using fun random emojis. Vote counts update live.\n"
-            "- No backup channel button or repeated info.\n"
-        )
         if message and hasattr(message, 'reply_text'):
-            await message.reply_text(txt, parse_mode="HTML")
+            await message.reply_text(HELP_MSG, parse_mode="HTML")
     else:
         if message and hasattr(message, 'reply_text'):
-            await message.reply_text("🚫 Unauthorized.")
+            await message.reply_text(UNAUTHORIZED_MSG)
 
 # --- Voting Callback Handler ---
 import telegram
@@ -238,6 +220,30 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=BOT_ADMIN_ID, text=f"Error in /post after {max_tries} tries: {error_msg}")
     log_important(f"ERROR in /post after {max_tries} tries: {error_msg}")
 
+async def setinterval(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    message = update.message
+    if not (user and user.id == BOT_ADMIN_ID):
+        if message and hasattr(message, 'reply_text'):
+            return await message.reply_text(UNAUTHORIZED_MSG)
+        return
+    args = context.args if context.args else []
+    if not message or not hasattr(message, 'reply_text'):
+        return
+    if len(args) != 2:
+        await message.reply_text(USAGE_SETINTERVAL)
+        return
+    try:
+        min_sec = int(args[0])
+        max_sec = int(args[1])
+        if min_sec < 60 or max_sec < min_sec:
+            await message.reply_text(INVALID_INTERVAL)
+            return
+        set_auto_post_interval(min_sec, max_sec)
+        await message.reply_text(f"✅ Auto-posting interval set to {min_sec}-{max_sec} seconds.")
+    except Exception as e:
+        await message.reply_text(f"{ERROR_GENERIC} Error: {e}")
+
 # --- Health & Root Endpoints ---
 async def health_check(request): return web.Response(text="OK")
 async def root(request): return web.Response(text="Bot is up!")
@@ -262,6 +268,7 @@ def main():
     app.add_handler(CommandHandler("logs", logs))
     app.add_handler(CommandHandler("health", health))
     app.add_handler(CommandHandler("restart", restart))
+    app.add_handler(CommandHandler("setinterval", setinterval))
     app.add_handler(CallbackQueryHandler(vote_callback, pattern=r"^vote_"))
     # Start health server and auto-posting
     loop = asyncio.get_event_loop()
