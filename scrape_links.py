@@ -8,6 +8,7 @@ import requests
 import logging
 import os
 from dotenv import load_dotenv
+from config import SCRAPEDO_TOKENS  # <-- import tokens from config
 
 load_dotenv()
 
@@ -34,9 +35,6 @@ def get_stealth_headers():
 logger = logging.getLogger("scrape_links")
 
 MAIN_URL = "https://bingotingo.com/best-social-media-platforms/"
-
-# Support multiple Scrape.do API keys (comma-separated in env)
-SCRAPEDO_TOKENS = [token.strip() for token in os.getenv("SCRAPEDO_TOKEN", "").split(",") if token.strip()]
 
 def get_canva_link_scrapedo_main():
     if not SCRAPEDO_TOKENS:

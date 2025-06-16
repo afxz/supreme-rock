@@ -25,3 +25,10 @@ BOT_ADMIN_ID = int(validate_env_var("BOT_ADMIN_ID"))
 
 # Add a path for important events log
 IMPORTANT_LOG_PATH = "important.log"
+
+# Scrape.do API tokens (comma-separated in env)
+def get_scrapedo_tokens():
+    tokens = os.getenv("SCRAPEDO_TOKEN", "")
+    return [token.strip() for token in tokens.split(",") if token.strip()]
+
+SCRAPEDO_TOKENS = get_scrapedo_tokens()
