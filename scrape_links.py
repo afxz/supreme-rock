@@ -53,21 +53,13 @@ def get_canva_link_scrapedo_main():
             html = resp.text
             soup = BeautifulSoup(html, "html.parser")
             btn = soup.select_one("a.su-button")
-            if not btn or not btn.get("href"):
-                logger.warning(f"[Scrape.do] No redirect button found with token {token}.")
-                continue
-            redirect_url = btn["href"]
-            return redirect_url
+            if btn and btn.get("href"):
+                return btn["href"]
         except Exception as e:
             logger.error(f"[Scrape.do] Exception with token {token}: {e}")
-            continue
     return None
 
 async def fetch_canva_link_from_redirect(redirect_url):
-    """
-    Fetch the redirect page using Scrape.do and extract the Canva link.
-    Try all tokens before failing.
-    """
     if not SCRAPEDO_TOKENS:
         logger.error("[Scrape.do] No API tokens set in environment variable SCRAPEDO_TOKENS.")
         return None
@@ -85,42 +77,42 @@ async def fetch_canva_link_from_redirect(redirect_url):
                 return resp.text
             html = await asyncio.to_thread(fetch_html)
             soup = BeautifulSoup(html, "html.parser")
+            found = False
             for a in soup.find_all('a'):
                 if isinstance(a, bs4.element.Tag):
                     href = a.get('href')
                     if isinstance(href, str) and href.startswith('https://www.canva.com/brand/'):
                         return href
+            # Try to find any Canva link in the HTML, even if not in <a> tags
+            import re
+            canva_match = re.search(r'https://www.canva.com/brand/join\?token=[^"\'\s<>]+', html)
+            if canva_match:
+                return canva_match.group(0)
+            logger.error(f"[Scrape.do] No Canva link found in redirect page. HTML snippet: {html[:500]}")
         except Exception as e:
             logger.error(f"[Scrape.do] Exception in fetch_canva_link_from_redirect with token {token}: {e}")
-            continue
     return None
 
 # --- Main scraping logic (Scrape.do only) ---
 def get_latest_redirect_link_via_api():
-    try:
-        link = get_canva_link_scrapedo_main()
-        if link:
-            logger.info("[Scraper] Success with Scrape.do")
-            return link
-        else:
-            logger.error("[Scraper] Scrape.do returned no link.")
-    except Exception as e:
-        logger.error(f"[Scraper] Scrape.do failed: {e}")
+    link = get_canva_link_scrapedo_main()
+    if link:
+        logger.info("[Scraper] Success with Scrape.do")
+        return link
+    else:
+        logger.error("[Scraper] Scrape.do returned no link.")
     return None
 
 # --- Async wrapper for bot usage ---
-async def get_latest_canva_link(retries=3):
-    for attempt in range(retries):
-        redirect_url = await asyncio.to_thread(get_latest_redirect_link_via_api)
-        if redirect_url:
-            canva_link = await fetch_canva_link_from_redirect(redirect_url)
-            if canva_link:
-                return canva_link
-            else:
-                logger.warning(f"[Scraper] Redirect page did not yield Canva link.")
-        logger.warning(f"[Scraper] Attempt {attempt+1} failed, retrying...")
-        await asyncio.sleep(random.uniform(2, 5))
-    raise Exception("All providers failed to fetch Canva link after retries.")
+async def get_latest_canva_link():
+    redirect_url = await asyncio.to_thread(get_latest_redirect_link_via_api)
+    if redirect_url:
+        canva_link = await fetch_canva_link_from_redirect(redirect_url)
+        if canva_link:
+            return canva_link
+        else:
+            logger.warning(f"[Scraper] Redirect page did not yield Canva link.")
+    raise Exception("All providers failed to fetch Canva link.")
 
 # Entry point for manual testing
 def main():
