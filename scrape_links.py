@@ -38,59 +38,64 @@ MAIN_URL = "https://bingotingo.com/best-social-media-platforms/"
 # Support multiple Scrape.do API keys (comma-separated in env)
 SCRAPEDO_TOKENS = [token.strip() for token in os.getenv("SCRAPEDO_TOKEN", "").split(",") if token.strip()]
 
-async def fetch_canva_link_from_redirect(redirect_url):
-    """
-    Fetch the redirect page using Scrape.do and extract the Canva link.
-    """
-    if not SCRAPEDO_TOKENS:
-        logger.error("[Scrape.do] No API tokens set in environment variable SCRAPEDO_TOKEN.")
-        return None
-    api_url = "http://api.scrape.do"
-    token = random.choice(SCRAPEDO_TOKENS)
-    params = {
-        "token": token,
-        "url": redirect_url
-    }
-    try:
-        # Use requests in a thread to avoid blocking event loop
-        def fetch_html():
-            resp = requests.get(api_url, params=params, timeout=30)
-            return resp.text
-        html = await asyncio.to_thread(fetch_html)
-        soup = BeautifulSoup(html, "html.parser")
-        for a in soup.find_all('a'):
-            if isinstance(a, bs4.element.Tag):
-                href = a.get('href')
-                if isinstance(href, str) and href.startswith('https://www.canva.com/brand/'):
-                    return href
-    except Exception as e:
-        logger.error(f"[Scrape.do] Exception in fetch_canva_link_from_redirect: {e}")
-    return None
-
-# --- Scrape.do provider (multi-key support) ---
 def get_canva_link_scrapedo_main():
     if not SCRAPEDO_TOKENS:
         logger.error("[Scrape.do] No API tokens set in environment variable SCRAPEDO_TOKEN.")
         return None
     api_url = "http://api.scrape.do"
-    token = random.choice(SCRAPEDO_TOKENS)
-    try:
+    tokens = SCRAPEDO_TOKENS[:]
+    random.shuffle(tokens)
+    for token in tokens:
+        try:
+            params = {
+                "token": token,
+                "url": MAIN_URL
+            }
+            resp = requests.get(api_url, params=params, timeout=30)
+            html = resp.text
+            soup = BeautifulSoup(html, "html.parser")
+            btn = soup.select_one("a.su-button")
+            if not btn or not btn.get("href"):
+                logger.warning(f"[Scrape.do] No redirect button found with token {token}.")
+                continue
+            redirect_url = btn["href"]
+            return redirect_url
+        except Exception as e:
+            logger.error(f"[Scrape.do] Exception with token {token}: {e}")
+            continue
+    return None
+
+async def fetch_canva_link_from_redirect(redirect_url):
+    """
+    Fetch the redirect page using Scrape.do and extract the Canva link.
+    Try all tokens before failing.
+    """
+    if not SCRAPEDO_TOKENS:
+        logger.error("[Scrape.do] No API tokens set in environment variable SCRAPEDO_TOKEN.")
+        return None
+    api_url = "http://api.scrape.do"
+    tokens = SCRAPEDO_TOKENS[:]
+    random.shuffle(tokens)
+    for token in tokens:
         params = {
             "token": token,
-            "url": MAIN_URL
+            "url": redirect_url
         }
-        resp = requests.get(api_url, params=params, timeout=30)
-        html = resp.text
-        soup = BeautifulSoup(html, "html.parser")
-        btn = soup.select_one("a.su-button")
-        if not btn or not btn.get("href"):
-            logger.warning("[Scrape.do] No redirect button found.")
-            return None
-        redirect_url = btn["href"]
-        return redirect_url
-    except Exception as e:
-        logger.error(f"[Scrape.do] Exception: {e}")
-        return None
+        try:
+            def fetch_html():
+                resp = requests.get(api_url, params=params, timeout=30)
+                return resp.text
+            html = await asyncio.to_thread(fetch_html)
+            soup = BeautifulSoup(html, "html.parser")
+            for a in soup.find_all('a'):
+                if isinstance(a, bs4.element.Tag):
+                    href = a.get('href')
+                    if isinstance(href, str) and href.startswith('https://www.canva.com/brand/'):
+                        return href
+        except Exception as e:
+            logger.error(f"[Scrape.do] Exception in fetch_canva_link_from_redirect with token {token}: {e}")
+            continue
+    return None
 
 # --- Main scraping logic (Scrape.do only) ---
 def get_latest_redirect_link_via_api():
