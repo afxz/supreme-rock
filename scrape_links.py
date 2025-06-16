@@ -38,7 +38,7 @@ MAIN_URL = "https://bingotingo.com/best-social-media-platforms/"
 
 def get_canva_link_scrapedo_main():
     if not SCRAPEDO_TOKENS:
-        logger.error("[Scrape.do] No API tokens set in environment variable SCRAPEDO_TOKEN.")
+        logger.error("[Scrape.do] No API tokens set in environment variable SCRAPEDO_TOKENS.")
         return None
     api_url = "http://api.scrape.do"
     tokens = SCRAPEDO_TOKENS[:]
@@ -69,7 +69,7 @@ async def fetch_canva_link_from_redirect(redirect_url):
     Try all tokens before failing.
     """
     if not SCRAPEDO_TOKENS:
-        logger.error("[Scrape.do] No API tokens set in environment variable SCRAPEDO_TOKEN.")
+        logger.error("[Scrape.do] No API tokens set in environment variable SCRAPEDO_TOKENS.")
         return None
     api_url = "http://api.scrape.do"
     tokens = SCRAPEDO_TOKENS[:]
