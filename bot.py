@@ -335,7 +335,7 @@ def main():
     # Start health server and auto-posting
     loop = asyncio.get_event_loop()
     loop.create_task(start_health_server())
-    loop.create_task(auto_posting_task(app))
+    loop.create_task(auto_posting_task(app.bot))
     logger.info("Starting polling…")
     app.run_polling()
 

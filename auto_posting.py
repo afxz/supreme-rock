@@ -9,8 +9,8 @@ from shared import format_canva_post_message, vote_data, last_posted_link, EMOJI
 logger = logging.getLogger(__name__)
 
 # Global auto-posting interval (in seconds)
-auto_post_min = 2400  # default 40 min
-auto_post_max = 3000  # default 50 min
+auto_post_min = 1800  # default 30 min
+auto_post_max = 2400  # default 40 min
 
 def set_auto_post_interval(min_sec, max_sec):
     global auto_post_min, auto_post_max
@@ -18,22 +18,25 @@ def set_auto_post_interval(min_sec, max_sec):
     auto_post_max = max_sec
     logger.info(f"[auto_posting_task] Interval updated: {auto_post_min}-{auto_post_max} seconds")
 
-async def auto_posting_task(context):
+async def auto_posting_task(bot):
     global last_posted_link
     import logging
     while True:
         try:
-            logging.info(f"[auto_posting_task] Sleeping for random interval between {auto_post_min} and {auto_post_max} seconds.")
             sleep_time = random.randint(auto_post_min, auto_post_max)
+            logging.info(f"[auto_posting_task] Next auto-post in {sleep_time} seconds (interval range: {auto_post_min}-{auto_post_max}).")
             await asyncio.sleep(sleep_time)
             logging.info(f"[auto_posting_task] Woke up after {sleep_time} seconds. Checking for new link...")
             latest = await get_latest_canva_link()
+            if latest is None:
+                logger.warning("[auto_posting_task] No link could be scraped (get_latest_canva_link returned None). Will retry after interval.")
+                continue
             if latest and latest != last_posted_link:
                 working_votes = 0
                 not_working_votes = 0
                 emoji_pair = secrets.choice(EMOJI_PAIRS)
                 msg, keyboard, emoji_pair = format_canva_post_message(latest, working_votes=working_votes, not_working_votes=not_working_votes, emoji_pair=emoji_pair)
-                sent_msg = await context.bot.send_message(chat_id=CHANNEL_ID, text=msg, parse_mode="HTML", reply_markup=keyboard)
+                sent_msg = await bot.send_message(chat_id=CHANNEL_ID, text=msg, parse_mode="HTML", reply_markup=keyboard)
                 vote_data[sent_msg.message_id] = {'working': working_votes, 'not_working': not_working_votes, 'voters': set(), 'emoji_pair': emoji_pair}
                 last_posted_link = latest
                 logger.info(f"[auto_posting_task] Posted new link: {latest}")
@@ -44,7 +47,7 @@ async def auto_posting_task(context):
                     vote_data[msg_id]['working'] = bump_votes
                     msg, keyboard, _ = format_canva_post_message(link, working_votes=bump_votes, not_working_votes=0, emoji_pair=emoji_pair)
                     try:
-                        await context.bot.edit_message_reply_markup(chat_id=CHANNEL_ID, message_id=msg_id, reply_markup=keyboard)
+                        await bot.edit_message_reply_markup(chat_id=CHANNEL_ID, message_id=msg_id, reply_markup=keyboard)
                     except Exception:
                         pass
                 asyncio.create_task(delayed_bump(sent_msg.message_id, latest, emoji_pair))

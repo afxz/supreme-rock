@@ -176,14 +176,18 @@ async def fetch_canva_link_from_redirect_mode(redirect_url):
 
 # --- Async wrapper for bot usage ---
 async def get_latest_canva_link():
-    redirect_url = await asyncio.to_thread(get_latest_redirect_link_via_api)
-    if redirect_url:
-        canva_link = await fetch_canva_link_from_redirect_mode(redirect_url)
-        if canva_link:
-            return canva_link
-        else:
-            logger.warning(f"[Scraper] Redirect page did not yield Canva link.")
-    raise Exception("All providers failed to fetch Canva link.")
+    try:
+        redirect_url = await asyncio.to_thread(get_latest_redirect_link_via_api)
+        if redirect_url:
+            canva_link = await fetch_canva_link_from_redirect_mode(redirect_url)
+            if canva_link:
+                return canva_link
+            else:
+                logger.warning(f"[Scraper] Redirect page did not yield Canva link.")
+        return None
+    except Exception as e:
+        logger.error(f"[Scraper] Exception in get_latest_canva_link: {e}")
+        return None
 
 # Entry point for manual testing
 def main():
