@@ -45,6 +45,17 @@ for log_file in ("bot.log", IMPORTANT_LOG_PATH):
     except FileNotFoundError:
         pass
 
+# --- Clean up voting data on startup ---
+def cleanup_vote_data(max_entries=200):
+    global vote_data
+    if len(vote_data) > max_entries:
+        # Keep only the most recent max_entries by message_id (assuming higher = newer)
+        sorted_ids = sorted(vote_data.keys(), reverse=True)
+        keep_ids = set(sorted_ids[:max_entries])
+        vote_data = {k: v for k, v in vote_data.items() if k in keep_ids}
+
+cleanup_vote_data()
+
 # --- Globals ---
 bot = Bot(token=BOT_TOKEN)
 
