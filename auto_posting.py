@@ -20,9 +20,13 @@ def set_auto_post_interval(min_sec, max_sec):
 
 async def auto_posting_task(context):
     global last_posted_link
+    import logging
     while True:
         try:
-            await asyncio.sleep(random.randint(auto_post_min, auto_post_max))
+            logging.info(f"[auto_posting_task] Sleeping for random interval between {auto_post_min} and {auto_post_max} seconds.")
+            sleep_time = random.randint(auto_post_min, auto_post_max)
+            await asyncio.sleep(sleep_time)
+            logging.info(f"[auto_posting_task] Woke up after {sleep_time} seconds. Checking for new link...")
             latest = await get_latest_canva_link()
             if latest and latest != last_posted_link:
                 working_votes = 0
@@ -44,5 +48,7 @@ async def auto_posting_task(context):
                     except Exception:
                         pass
                 asyncio.create_task(delayed_bump(sent_msg.message_id, latest, emoji_pair))
+            else:
+                logger.info(f"[auto_posting_task] No new link found or already posted.")
         except Exception as e:
             logger.error(f"[auto_posting_task] Error: {e}")
