@@ -36,6 +36,20 @@ logger = logging.getLogger("scrape_links")
 
 MAIN_URL = "https://bingotingo.com/best-social-media-platforms/"
 
+# Scraping mode: 'scrapedo', 'direct', or 'both'
+scraping_mode = 'direct'  # default
+
+def set_scraping_mode(mode):
+    global scraping_mode
+    if mode in ('scrapedo', 'direct', 'both'):
+        scraping_mode = mode
+        logger.info(f"[Scraper] Scraping mode set to: {mode}")
+        return True
+    return False
+
+def get_scraping_mode():
+    return scraping_mode
+
 def get_canva_link_scrapedo_main():
     if not SCRAPEDO_TOKENS:
         logger.error("[Scrape.do] No API tokens set in environment variable SCRAPEDO_TOKENS.")
@@ -93,21 +107,78 @@ async def fetch_canva_link_from_redirect(redirect_url):
             logger.error(f"[Scrape.do] Exception in fetch_canva_link_from_redirect with token {token}: {e}")
     return None
 
-# --- Main scraping logic (Scrape.do only) ---
+# --- Direct scraping fallback (non-Scrape.do) ---
+def get_canva_link_direct_main():
+    try:
+        resp = requests.get(MAIN_URL, headers=get_stealth_headers(), timeout=30)
+        html = resp.text
+        soup = BeautifulSoup(html, "html.parser")
+        btn = soup.select_one("a.su-button")
+        if btn and btn.get("href"):
+            return btn["href"]
+    except Exception as e:
+        logger.error(f"[Direct] Exception: {e}")
+    return None
+
+async def fetch_canva_link_from_redirect_direct(redirect_url):
+    try:
+        def fetch_html():
+            resp = requests.get(redirect_url, headers=get_stealth_headers(), timeout=30)
+            return resp.text
+        html = await asyncio.to_thread(fetch_html)
+        soup = BeautifulSoup(html, "html.parser")
+        for a in soup.find_all('a'):
+            if isinstance(a, bs4.element.Tag):
+                href = a.get('href')
+                if isinstance(href, str) and href.startswith('https://www.canva.com/brand/'):
+                    return href
+        # Regex fallback
+        import re
+        canva_match = re.search(r'https://www.canva.com/brand/join\?token=[^"\'\s<>]+', html)
+        if canva_match:
+            return canva_match.group(0)
+        logger.error(f"[Direct] No Canva link found in redirect page. HTML snippet: {html[:500]}")
+    except Exception as e:
+        logger.error(f"[Direct] Exception in fetch_canva_link_from_redirect: {e}")
+    return None
+
+# --- Main scraping logic (mode aware) ---
 def get_latest_redirect_link_via_api():
-    link = get_canva_link_scrapedo_main()
-    if link:
-        logger.info("[Scraper] Success with Scrape.do")
-        return link
-    else:
-        logger.error("[Scraper] Scrape.do returned no link.")
+    mode = get_scraping_mode()
+    if mode in ('scrapedo', 'both'):
+        link = get_canva_link_scrapedo_main()
+        if link:
+            logger.info("[Scraper] Success with Scrape.do")
+            return link
+        elif mode == 'scrapedo':
+            logger.error("[Scraper] Scrape.do returned no link.")
+            return None
+    if mode in ('direct', 'both'):
+        link = get_canva_link_direct_main()
+        if link:
+            logger.info("[Scraper] Success with direct scraping")
+            return link
+        else:
+            logger.error("[Scraper] Direct scraping returned no link.")
+    return None
+
+async def fetch_canva_link_from_redirect_mode(redirect_url):
+    mode = get_scraping_mode()
+    if mode in ('scrapedo', 'both'):
+        link = await fetch_canva_link_from_redirect(redirect_url)
+        if link:
+            return link
+    if mode in ('direct', 'both'):
+        link = await fetch_canva_link_from_redirect_direct(redirect_url)
+        if link:
+            return link
     return None
 
 # --- Async wrapper for bot usage ---
 async def get_latest_canva_link():
     redirect_url = await asyncio.to_thread(get_latest_redirect_link_via_api)
     if redirect_url:
-        canva_link = await fetch_canva_link_from_redirect(redirect_url)
+        canva_link = await fetch_canva_link_from_redirect_mode(redirect_url)
         if canva_link:
             return canva_link
         else:

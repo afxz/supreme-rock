@@ -15,11 +15,11 @@ from aiohttp import web
 from telegram import Bot, Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
 
-from scrape_links import get_latest_canva_link
+from scrape_links import get_latest_canva_link, set_scraping_mode, get_scraping_mode
 from config import BOT_TOKEN, CHANNEL_ID, BOT_ADMIN_ID, IMPORTANT_LOG_PATH
 from auto_posting import auto_posting_task, set_auto_post_interval
 from shared import vote_data, last_posted_link, format_canva_post_message, EMOJI_PAIRS
-from strings import HELP_MSG, START_MSG, UNAUTHORIZED_MSG, USAGE_SETINTERVAL, INVALID_INTERVAL, ERROR_GENERIC
+from strings import HELP_MSG, START_MSG, UNAUTHORIZED_MSG, USAGE_SETINTERVAL, INVALID_INTERVAL, ERROR_GENERIC, USAGE_SET_SCRAPE_MODE
 
 import aiohttp
 from bs4 import BeautifulSoup
@@ -70,8 +70,13 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     message = update.message
     if user and user.id == BOT_ADMIN_ID:
+        txt = (
+            HELP_MSG +
+            f"\n<b>Scraping Mode:</b> <code>{get_scraping_mode()}</code>\n" +
+            "/setscrapemode <scrapedo|direct|both> - Enable/disable scraping methods.\n"
+        )
         if message and hasattr(message, 'reply_text'):
-            await message.reply_text(HELP_MSG, parse_mode="HTML")
+            await message.reply_text(txt, parse_mode="HTML")
     else:
         if message and hasattr(message, 'reply_text'):
             await message.reply_text(UNAUTHORIZED_MSG)
@@ -244,6 +249,25 @@ async def setinterval(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await message.reply_text(f"{ERROR_GENERIC} Error: {e}")
 
+async def setscrapemode(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    message = update.message
+    if not (user and user.id == BOT_ADMIN_ID):
+        if message and hasattr(message, 'reply_text'):
+            return await message.reply_text(UNAUTHORIZED_MSG)
+        return
+    args = context.args if context.args else []
+    if not message or not hasattr(message, 'reply_text'):
+        return
+    if len(args) != 1 or args[0] not in ('scrapedo', 'direct', 'both'):
+        await message.reply_text(USAGE_SET_SCRAPE_MODE)
+        return
+    mode = args[0]
+    if set_scraping_mode(mode):
+        await message.reply_text(f"✅ Scraping mode set to: {mode}")
+    else:
+        await message.reply_text(ERROR_GENERIC)
+
 # --- Health & Root Endpoints ---
 async def health_check(request): return web.Response(text="OK")
 async def root(request): return web.Response(text="Bot is up!")
@@ -269,6 +293,7 @@ def main():
     app.add_handler(CommandHandler("health", health))
     app.add_handler(CommandHandler("restart", restart))
     app.add_handler(CommandHandler("setinterval", setinterval))
+    app.add_handler(CommandHandler("setscrapemode", setscrapemode))
     app.add_handler(CallbackQueryHandler(vote_callback, pattern=r"^vote_"))
     # Start health server and auto-posting
     loop = asyncio.get_event_loop()
