@@ -73,7 +73,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         txt = (
             HELP_MSG +
             f"\n<b>Scraping Mode:</b> <code>{get_scraping_mode()}</code>\n" +
-            "/setscrapemode <scrapedo|direct|both> - Enable/disable scraping methods.\n"
+            "/setscrapemode <scrapedo|direct|both> - Enable/disable scraping methods.\n" +
+            "/stats - Show bot stats and current settings.\n"
         )
         if message and hasattr(message, 'reply_text'):
             await message.reply_text(txt, parse_mode="HTML")
@@ -268,6 +269,31 @@ async def setscrapemode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await message.reply_text(ERROR_GENERIC)
 
+async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    message = update.message
+    if not (user and user.id == BOT_ADMIN_ID):
+        if message and hasattr(message, 'reply_text'):
+            return await message.reply_text(UNAUTHORIZED_MSG)
+        return
+    from scrape_links import get_scraping_mode
+    from auto_posting import auto_post_min, auto_post_max
+    import platform
+    import time
+    import os
+    stats_msg = (
+        f"<b>Bot Stats & Settings</b>\n"
+        f"<b>Scraping Mode:</b> <code>{get_scraping_mode()}</code>\n"
+        f"<b>Auto-post interval:</b> <code>{auto_post_min}-{auto_post_max} sec</code>\n"
+        f"<b>Python version:</b> <code>{platform.python_version()}</code>\n"
+        f"<b>Platform:</b> <code>{platform.system()} {platform.release()}</code>\n"
+        f"<b>Uptime:</b> <code>{int(time.time() - os.getpid())} sec (PID as start)</code>\n"
+        f"<b>Channel ID:</b> <code>{CHANNEL_ID}</code>\n"
+        f"<b>Admin ID:</b> <code>{BOT_ADMIN_ID}</code>\n"
+    )
+    if message and hasattr(message, 'reply_text'):
+        await message.reply_text(stats_msg, parse_mode="HTML")
+
 # --- Health & Root Endpoints ---
 async def health_check(request): return web.Response(text="OK")
 async def root(request): return web.Response(text="Bot is up!")
@@ -294,6 +320,7 @@ def main():
     app.add_handler(CommandHandler("restart", restart))
     app.add_handler(CommandHandler("setinterval", setinterval))
     app.add_handler(CommandHandler("setscrapemode", setscrapemode))
+    app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CallbackQueryHandler(vote_callback, pattern=r"^vote_"))
     # Start health server and auto-posting
     loop = asyncio.get_event_loop()
