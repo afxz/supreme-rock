@@ -23,13 +23,15 @@ async def auto_posting_task(bot):
     import logging
     while True:
         try:
-            # --- Dynamic sleep: check interval every second ---
-            sleep_time = random.randint(auto_post_min, auto_post_max)
-            logging.info(f"[auto_posting_task] Next auto-post in {sleep_time} seconds (interval range: {auto_post_min}-{auto_post_max}).")
+            # Store the interval range at the start
+            start_min = auto_post_min
+            start_max = auto_post_max
+            sleep_time = random.randint(start_min, start_max)
+            logging.info(f"[auto_posting_task] Next auto-post in {sleep_time} seconds (interval range: {start_min}-{start_max}).")
             for _ in range(sleep_time):
                 await asyncio.sleep(1)
                 # If interval changed, break and restart sleep with new interval
-                if sleep_time != random.randint(auto_post_min, auto_post_max):
+                if (auto_post_min, auto_post_max) != (start_min, start_max):
                     logging.info("[auto_posting_task] Interval changed during sleep, recalculating...")
                     break
             else:
