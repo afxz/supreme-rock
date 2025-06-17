@@ -28,5 +28,5 @@ UNAUTHORIZED_MSG = "🚫 You’re not authorized."
 USAGE_SETINTERVAL = "Usage: /setinterval <min_seconds> <max_seconds>\nExample: /setinterval 300 400"
 INVALID_INTERVAL = "Invalid values. min >= 60, max >= min."
 ERROR_GENERIC = "An error occurred. Please try again."
-USAGE_SET_SCRAPE_MODE = "Usage: /setscrapemode &lt;scrapedo|direct|both&gt;\nExample: /setscrapemode scrapedo"
+USAGE_SET_SCRAPE_MODE = "Usage: /setscrapemode <code>scrapedo</code>|<code>direct</code>|<code>both</code>\nExample: /setscrapemode <code>scrapedo</code>"
 
