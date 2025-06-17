@@ -145,31 +145,31 @@ async def fetch_canva_link_from_redirect_direct(redirect_url):
 # --- Main scraping logic (mode aware) ---
 def get_latest_redirect_link_via_api():
     mode = get_scraping_mode()
-    if mode in ('scrapedo', 'both'):
-        link = get_canva_link_scrapedo_main()
-        if link:
-            logger.info("[Scraper] Success with Scrape.do")
-            return link
-        elif mode == 'scrapedo':
-            logger.error("[Scraper] Scrape.do returned no link.")
-            return None
     if mode in ('direct', 'both'):
         link = get_canva_link_direct_main()
         if link:
             logger.info("[Scraper] Success with direct scraping")
             return link
-        else:
+        elif mode == 'direct':
             logger.error("[Scraper] Direct scraping returned no link.")
+            return None
+    if mode in ('scrapedo', 'both'):
+        link = get_canva_link_scrapedo_main()
+        if link:
+            logger.info("[Scraper] Success with Scrape.do")
+            return link
+        else:
+            logger.error("[Scraper] Scrape.do returned no link.")
     return None
 
 async def fetch_canva_link_from_redirect_mode(redirect_url):
     mode = get_scraping_mode()
-    if mode in ('scrapedo', 'both'):
-        link = await fetch_canva_link_from_redirect(redirect_url)
-        if link:
-            return link
     if mode in ('direct', 'both'):
         link = await fetch_canva_link_from_redirect_direct(redirect_url)
+        if link:
+            return link
+    if mode in ('scrapedo', 'both'):
+        link = await fetch_canva_link_from_redirect(redirect_url)
         if link:
             return link
     return None
