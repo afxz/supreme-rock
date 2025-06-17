@@ -73,7 +73,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         txt = (
             HELP_MSG +
             f"\n<b>Scraping Mode:</b> <code>{get_scraping_mode()}</code>\n" +
-            "/setscrapemode <scrapedo|direct|both> - Enable/disable scraping methods.\n" +
             "/stats - Show bot stats and current settings.\n"
         )
         if message and hasattr(message, 'reply_text'):

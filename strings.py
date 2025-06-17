@@ -9,7 +9,7 @@ HELP_MSG = (
     "/logs - Show recent important logs\n"
     "/health - Check bot health\n"
     "/restart - Restart the bot (Koyeb will auto-restart)\n"
-    "/setscrapemode &lt;scrapedo|direct|both&gt; - Enable/disable scraping methods.\n"
+    "/setscrapemode <code>scrapedo</code>|<code>direct</code>|<code>both</code> - Enable/disable scraping methods.\n"
     "/stats - Show bot stats and current settings.\n"
     "\n"
     "<b>Auto-Posting Info:</b>\n"
