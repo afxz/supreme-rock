@@ -3,13 +3,14 @@
 HELP_MSG = (
     "<b>Admin Commands:</b>\n"
     "/post - Scrape & post the latest link\n"
+    "/now &lt;canva_link&gt; - Manually post a Canva link to the channel (with natural voting)\n"
     "/setinterval &lt;min_seconds&gt; &lt;max_seconds&gt; - Set auto-post interval (e.g. /setinterval 300 400)\n"
     "/help - This menu\n"
     "/lastlink - Show the last posted Canva link\n"
     "/logs - Show recent important logs\n"
     "/health - Check bot health\n"
     "/restart - Restart the bot (Koyeb will auto-restart)\n"
-    "/setscrapemode <code>scrapedo</code>|<code>direct</code>|<code>both</code> - Enable/disable scraping methods.\n"
+    "/setscrapemode &lt;code&gt;scrapedo&lt;/code&gt;|&lt;code&gt;direct&lt;/code&gt;|&lt;code&gt;both&lt;/code&gt; - Enable/disable scraping methods.\n"
     "/stats - Show bot stats and current settings.\n"
     "\n"
     "<b>Auto-Posting Info:</b>\n"
@@ -20,7 +21,7 @@ HELP_MSG = (
     "\n"
     "<b>Channel Post Format:</b>\n"
     "- Each post contains the Canva link, a proof/verification instruction, and two buttons: Share Channel and Join Backup.\n"
-    "- Users can vote if the link is working or not using fun random emojis. Vote counts update live.\n"
+    "- Users can vote if the link is working or not using fun random emojis. Vote counts update live and may increase naturally.\n"
 )
 
 START_MSG = "🎉 Bot started! Use /help to see commands."
