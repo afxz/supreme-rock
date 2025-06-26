@@ -63,6 +63,16 @@ def log_important(event: str):
     with open(IMPORTANT_LOG_PATH, "a") as f:
         f.write(event + "\n")
 
+# --- Navigation Keyboard Helper ---
+def get_help_keyboard():
+    from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🛠 Admin Commands", callback_data="help_admin")],
+        [InlineKeyboardButton("🤖 Auto-Posting Info", callback_data="help_auto")],
+        [InlineKeyboardButton("📢 Channel Post Format", callback_data="help_format")],
+        [InlineKeyboardButton("📊 Bot Stats", callback_data="help_stats")],
+    ])
+
 # --- Command Handlers ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -72,13 +82,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if message and hasattr(message, 'date'):
             log_important(f"/start by admin at {message.date}")
         # Navigation buttons for categories
-        from telegram import InlineKeyboardMarkup, InlineKeyboardButton
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🛠 Admin Commands", callback_data="help_admin")],
-            [InlineKeyboardButton("🤖 Auto-Posting Info", callback_data="help_auto")],
-            [InlineKeyboardButton("📢 Channel Post Format", callback_data="help_format")],
-            [InlineKeyboardButton("📊 Bot Stats", callback_data="help_stats")],
-        ])
+        keyboard = get_help_keyboard()
         if message is not None and hasattr(message, 'reply_text'):
             await message.reply_text(
                 "Welcome! Use the buttons below to navigate bot features.",
@@ -91,6 +95,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # --- Help navigation callbacks ---
 async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info("help_callback triggered")
     query = update.callback_query
     if not query:
         return
@@ -139,17 +144,15 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     else:
         text = "Unknown section."
-    # Only pass reply_markup if it exists
-    reply_markup = getattr(query.message, 'reply_markup', None)
-    if reply_markup:
-        await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
-    else:
-        await query.edit_message_text(text, parse_mode="HTML")
+    # Always include the navigation keyboard
+    reply_markup = get_help_keyboard()
+    await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
     await query.answer()
 
 # --- Voting Callback Handler ---
 import telegram
 async def vote_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info("vote_callback triggered")
     query = getattr(update, 'callback_query', None)
     if not query or not hasattr(query, 'message') or not hasattr(query, 'from_user'):
         return
@@ -475,8 +478,8 @@ def main():
     app.add_handler(CommandHandler("setinterval", setinterval))
     app.add_handler(CommandHandler("setscrapemode", setscrapemode))
     app.add_handler(CommandHandler("stats", stats))
-    app.add_handler(CallbackQueryHandler(vote_callback, pattern=r"^vote_"))
     app.add_handler(CallbackQueryHandler(help_callback, pattern=r"^help_"))
+    app.add_handler(CallbackQueryHandler(vote_callback, pattern=r"^vote_"))
     # Start health server and auto-posting
     loop = asyncio.get_event_loop()
     loop.create_task(start_health_server())
