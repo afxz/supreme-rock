@@ -420,8 +420,9 @@ async def now(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not canva_link.startswith("https://www.canva.com/brand/join?token="):
         await message.reply_text("Invalid Canva link format.")
         return
-    fake_working = random.randint(10, 20)
-    fake_not_working = random.randint(0, 2)
+    # Start with 0 votes, then gradually add fake working votes only
+    fake_working = 0
+    fake_not_working = 0
     emoji_pair = secrets.choice(EMOJI_PAIRS)
     msg, keyboard, _ = format_canva_post_message(canva_link, working_votes=fake_working, not_working_votes=fake_not_working, emoji_pair=emoji_pair)
     sent_msg = await context.bot.send_message(chat_id=CHANNEL_ID, text=msg, parse_mode="HTML", reply_markup=keyboard)
@@ -430,11 +431,11 @@ async def now(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if message and hasattr(message, 'reply_text'):
         await message.reply_text("✅ Link posted to channel.")
     log_important(f"Manual /now post: {canva_link}")
-    # Gradually increase working votes
-    async def gradual_working_bump(msg_id, link, emoji_pair, start_votes):
-        target = start_votes + random.randint(3, 8)
-        for _ in range(target - start_votes):
-            await asyncio.sleep(random.randint(60, 180))
+    # Gradually increase working votes only
+    async def gradual_working_bump(msg_id, link, emoji_pair):
+        target = random.randint(10, 20)
+        for _ in range(target):
+            await asyncio.sleep(random.randint(10, 30))
             if msg_id in vote_data:
                 vote_data[msg_id]['working'] += 1
                 msg, keyboard, _ = format_canva_post_message(link, working_votes=vote_data[msg_id]['working'], not_working_votes=vote_data[msg_id]['not_working'], emoji_pair=emoji_pair)
@@ -442,7 +443,7 @@ async def now(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await context.bot.edit_message_reply_markup(chat_id=CHANNEL_ID, message_id=msg_id, reply_markup=keyboard)
                 except Exception:
                     pass
-    asyncio.create_task(gradual_working_bump(sent_msg.message_id, canva_link, emoji_pair, fake_working))
+    asyncio.create_task(gradual_working_bump(sent_msg.message_id, canva_link, emoji_pair))
     # Not working votes never exceed working votes
     async def not_working_guard(msg_id, link, emoji_pair):
         while True:
